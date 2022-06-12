@@ -11,11 +11,10 @@
 #include "Preferences.h"
 #include <esp_task_wdt.h>
 #include "cred.h"
+#define WDT_TIMEOUT 30
 
 const char *ssid = SS_ID;
 const char *password = auth;
-#define WDT_TIMEOUT 30
-
 const char *http_username = user;
 const char *http_password = pass;
 
