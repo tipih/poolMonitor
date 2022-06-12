@@ -34,7 +34,6 @@ signed int rssi = 0;
 int currentRelaxStatus = 0;
 
 const char *input_parameter = "state";
-
 const int output = 14;
 
 Preferences preferences;
