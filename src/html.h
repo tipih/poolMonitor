@@ -49,15 +49,28 @@ const char index_html[] PROGMEM = R"rawliteral(
 .card:hover {
   box-shadow: 0 8px 16px 0 rgba(0,0,0,0.5);
 }
-     </style>
+
+.dot {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+  height: 10px;
+  width: 10px;
+  background-color: #f00;
+  border-radius: 50%;
+  display: inline-block;
+} 
+ 
+</style>
   </head>
   <body>
   
   <h1  style="color:#999999;"> "ESP Pump control </h1>
-  <h5  style="color:#ffffff;" id="rssi"> -65 </h5>
-    <button class="button" onmousedown="toggleCheckbox('LowOn');" ontouchstart="toggleCheckbox('LowOn');" onmouseup="toggleCheckbox('LowOff');" ontouchend="toggleCheckbox('LowOff');">Pump low speed</button>
+    <h5  style="color:#ffffff;" id="rssi">RSSI -65 Time 08:00:00 14.06.2022  </h5>
+    <h5 class="dot" id="mydot"></h5>
+    <button class="button" onmousedown="toggleCheckbox('LowOn');" onmouseup="toggleCheckbox('LowOff');">Pump low speed</button>
     
-    <button class="button" onmousedown="toggleCheckbox('HighOn');" ontouchstart="toggleCheckbox('HighOn');" onmouseup="toggleCheckbox('HighOff');" ontouchend="toggleCheckbox('HighOff');">Pump high speed</button>
+    <button class="button" onmousedown="toggleCheckbox('HighOn');" onmouseup="toggleCheckbox('HighOff');">Pump high speed</button>
   
   <h2 style="color:#999999;" id="poolPumpSpeed">Pump Speed LOW</h2>
 
@@ -102,6 +115,7 @@ const char index_html[] PROGMEM = R"rawliteral(
  </div>
 
 <script>
+var server_running = true;
  function logoutButton() {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "/logout", true);
@@ -171,6 +185,13 @@ const char index_html[] PROGMEM = R"rawliteral(
      var timeon;
      var timeoff;
      var rssi;
+     var hh;
+     var mm;
+     var ss;
+     var dd;
+     var md;
+     var yy;
+     server_running=true;
      console.log(obj.poolRelaxStatus);
      console.log(obj.pumpSpeed);
      pumpSpeed = obj.pumpSpeed;
@@ -178,6 +199,12 @@ const char index_html[] PROGMEM = R"rawliteral(
      timeon=obj.onTime;
      timeoff=obj.offTime;
      rssi=obj.rssi;
+     hh=obj.hh;
+     mm=obj.mm;
+     ss=obj.ss;
+     dd=obj.dd;
+     md=obj.md;
+     yy=obj.yy;
 
 if (RelaxStatus==1) 
     {
@@ -202,14 +229,32 @@ if (pumpSpeed==0)
     }
     document.getElementById("timeOn").innerHTML =timeon ;
     document.getElementById("timeOff").innerHTML =timeoff ; 
-    document.getElementById("rssi").innerHTML =rssi ;
+    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Time:"+hh+":"+mm+" Date "+dd+"."+md+"."+yy;
+  
 
 
   }
  };
   xhttp.open("GET", "/state", true);
   xhttp.send();
-}, 1500 ) ;
+}, 2000 ) ;
+
+setInterval(function ( ) {
+
+var colorStatus = document.getElementById("mydot").style.backgroundColor;
+
+if ((colorStatus == "red") && (server_running==true)) {
+  document.getElementById("mydot").style.backgroundColor  = "green";
+  server_running=false;
+  }
+  else
+  {
+  document.getElementById("mydot").style.backgroundColor  = "red";
+  }
+
+
+
+},1000);
 
   </script>
   </body>

@@ -25,6 +25,12 @@ const long timeoutTime = 2000;
 const long ledSpeed = 500;
 unsigned long currentHour = 1;
 unsigned long currentMinute = 1;
+unsigned long currentSec = 1;
+unsigned long currentDay = 1;
+unsigned long currentMd = 1;
+unsigned long currentYr = 1;
+
+
 unsigned long currentTime = millis();
 unsigned long previousTime = 0;
 unsigned long onHour = 6;
@@ -234,9 +240,10 @@ void setupServer()
       Serial.println("Got an update reuest");
       if (!request->authenticate(http_username, http_password))
        return request->requestAuthentication();
-      char buffer[100];
+      char buffer[200];
       //Format a json string, with all the data to be updated in the client
-      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\"}", currentRelaxStatus, currentSpeed, onHour, offHour, rssi);
+      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\",\"hh\":\"%02d\",\"mm\":\"%02d\",\"ss\":\"%02d\",\"dd\":\"%02d\",\"md\":\"%02d\",\"yy\":\"%02d\"}"
+      , currentRelaxStatus, currentSpeed, onHour, offHour, rssi,currentHour,currentMinute,currentSec,currentDay,currentMd,currentYr);
       Serial.print(buffer);
       //Send data to the client
       request->send(200, "application/json", buffer); });
@@ -252,7 +259,7 @@ void printLocalTime()
 {
   struct tm timeinfo;
 
-  if (millis() - previousTime > 30000)
+  if (millis() - previousTime > 1000)
   {
     if (!getLocalTime(&timeinfo))
     {
@@ -262,11 +269,18 @@ void printLocalTime()
     previousTime = millis();
     currentHour = timeinfo.tm_hour;
     currentMinute = timeinfo.tm_min;
+    currentSec =timeinfo.tm_sec;
+    currentDay =timeinfo.tm_mday;
+    currentMd=timeinfo.tm_mon;
+    currentYr=timeinfo.tm_year+1900;
+
     Serial.println(currentHour);
     Serial.println(currentMinute);
+    Serial.println(currentYr);
+    //Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
   }
 
-  // Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
 }
 //******************************************************************************
 
@@ -473,5 +487,5 @@ void loop()
     goLowSpeed();
   }
 
-  delay(2000);
+  delay(500);
 }
