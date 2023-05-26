@@ -202,7 +202,7 @@ if (pumpSpeed==0)
     }
     document.getElementById("timeOn").innerHTML =timeon ;
     document.getElementById("timeOff").innerHTML =timeoff ; 
-    document.getElementById("rssi").innerHTML =rssi ;
+    document.getElementById("rssi").innerHTML ="RSSI Value "+rssi ;
 
 
   }
