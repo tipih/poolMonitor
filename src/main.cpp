@@ -31,6 +31,12 @@ unsigned long currentMd = 1;
 unsigned long currentYr = 1;
 unsigned long currentHour = 1;
 unsigned long currentMinute = 1;
+unsigned long currentSec = 1;
+unsigned long currentDay = 1;
+unsigned long currentMd = 1;
+unsigned long currentYr = 1;
+
+
 unsigned long currentTime = millis();
 unsigned long previousTime = 0;
 unsigned long onHour = 6;
@@ -355,7 +361,7 @@ void printLocalTime()
 {
   struct tm timeinfo;
 
-  if (millis() - previousTime > 30000)
+  if (millis() - previousTime > 1000)
   {
     if (!getLocalTime(&timeinfo))
     {
@@ -377,9 +383,11 @@ void printLocalTime()
     Serial.println(currentYr);
     Serial.println(currentHour);
     Serial.println(currentMinute);
+    Serial.println(currentYr);
+    //Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
   }
 
-  // Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
 }
 //******************************************************************************
 
@@ -602,5 +610,5 @@ void loop()
     goLowSpeed();
   }
 
-  delay(2000);
+  delay(500);
 }

@@ -60,7 +60,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   border-radius: 50%;
   display: inline-block;
 }
-  </style>
+     </style>
   </head>
   <body>
   
@@ -214,15 +214,6 @@ const char index_html[] PROGMEM = R"rawliteral(
      timeon=obj.onTime;
      timeoff=obj.offTime;
      rssi=obj.rssi;
-     hh=obj.hh;
-     mm=obj.mm;
-     ss=obj.ss;
-     dd=obj.dd;
-     md=obj.md;
-     yy=obj.yy;
-     temperatur=obj.currentTemp;
-
-document.getElementById("status_temp").innerHTML ="Water Temp: "+temperatur;
 
 if (RelaxStatus==1) 
     {
@@ -256,7 +247,7 @@ if (pumpSpeed==0)
 
     document.getElementById("timeOn").innerHTML =timeon ;
     document.getElementById("timeOff").innerHTML =timeoff ; 
-    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Time:"+hh+":"+mm+" Date "+dd+"."+md+"."+yy;
+    document.getElementById("rssi").innerHTML =rssi ;
 
 
   }
@@ -264,6 +255,23 @@ if (pumpSpeed==0)
   xhttp.open("GET", "/state", true);
   xhttp.send();
 }, 2000 ) ;
+
+setInterval(function ( ) {
+
+var colorStatus = document.getElementById("mydot").style.backgroundColor;
+
+if ((colorStatus == "red") && (server_running==true)) {
+  document.getElementById("mydot").style.backgroundColor  = "green";
+  server_running=false;
+  }
+  else
+  {
+  document.getElementById("mydot").style.backgroundColor  = "red";
+  }
+
+
+
+},1000);
 
 setInterval(function ( ) {
 
