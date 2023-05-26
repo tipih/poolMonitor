@@ -11,6 +11,7 @@
 #include "Preferences.h"
 #include <esp_task_wdt.h>
 #include "cred.h"
+#include <DallasTemperature.h>
 #define WDT_TIMEOUT 30
 
 const char *ssid = SS_ID;
@@ -23,6 +24,11 @@ const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 const long timeoutTime = 2000;
 const long ledSpeed = 500;
+
+unsigned long currentSec = 1;
+unsigned long currentDay = 1;
+unsigned long currentMd = 1;
+unsigned long currentYr = 1;
 unsigned long currentHour = 1;
 unsigned long currentMinute = 1;
 unsigned long currentTime = millis();
@@ -34,7 +40,16 @@ signed int rssi = 0;
 int currentRelaxStatus = 0;
 
 const char *input_parameter = "state";
+float currentTemp = -999;
 const int output = 14;
+
+// Data wire is plugged into port 2 on the Arduino
+#define ONE_WIRE_BUS 4
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+unsigned long lastDallasRead = millis();
 
 Preferences preferences;
 
@@ -42,7 +57,9 @@ typedef enum
 {
   lowSpeed,
   highSpeed,
-  noSpeed
+  noSpeed,
+  medSpeed,
+  stop
 } pumpSpeed;
 pumpSpeed currentSpeed = noSpeed;
 
@@ -92,6 +109,32 @@ void setPreference()
 }
 //******************************************************************************
 
+
+//******************************************************************************
+// Get Dallas temp data
+float getTemperatur()
+{
+ sensors.requestTemperatures(); // Send the command to get temperatures
+ float tempC = sensors.getTempCByIndex(0);
+ if (tempC != DEVICE_DISCONNECTED_C)
+  {
+    Serial.print("Temperature for the device 1 (index 0) is: ");
+    Serial.println(tempC);
+    return tempC;
+
+  }
+  else
+  {
+    Serial.println("Error: Could not read temperature data");
+    return -999;
+  }
+
+
+
+}
+//******************************************************************************
+
+
 //******************************************************************************
 // Function to set on/off time for the pump, and store the new values to NVM
 void setOnOffTime(unsigned long ontime, unsigned long offtime)
@@ -107,31 +150,79 @@ void setOnOffTime(unsigned long ontime, unsigned long offtime)
 // Function to set Low speed for the pump, will simulatate button press
 void goLowSpeed()
 {
-  digitalWrite(27, HIGH); // GIOP27
+  digitalWrite(27, HIGH); // HignSpeed button
   delay(100);
-  digitalWrite(26, LOW);
+  digitalWrite(14, HIGH); // MedSpeed button
+  delay(100);
+  digitalWrite(25, HIGH); // Stop button
+  delay(100);
+  digitalWrite(26, LOW);  //Low Speed button
   delay(500);
-  digitalWrite(26, HIGH);
+  digitalWrite(26, HIGH);  //Low speed button
   delay(500);
   currentSpeed = lowSpeed;
   // digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
 
+
 //******************************************************************************
 // Function to set Hihg speed for the pump, will simulatate button press
 void goHighSpeed()
 {
-  digitalWrite(26, HIGH); // GIOP27
+  digitalWrite(26, HIGH); // HighSpeed Button 
   delay(100);
-  digitalWrite(27, LOW);
+  digitalWrite(14, HIGH); // MedSpeed button
+  delay(100);
+  digitalWrite(25, HIGH); // Stop button
+  delay(100);
+  digitalWrite(27, LOW);  //High Speed button
   delay(500);
-  digitalWrite(27, HIGH);
+  digitalWrite(27, HIGH);  //HighSpeed button
   delay(500);
   currentSpeed = highSpeed;
   // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
+
+//******************************************************************************
+// Function to set Med speed for the pump, will simulatate button press
+void goMedSpeed()
+{
+  digitalWrite(26, HIGH); // Lowspeed button
+  delay(100);
+  digitalWrite(25, HIGH); // Stop button
+  delay(100);
+  digitalWrite(27, HIGH); // Highspeed button
+  delay(100);
+  digitalWrite(14, LOW);  // Medspeed button
+  delay(500);
+  digitalWrite(14, HIGH);  //Medspeed button
+  delay(500);
+  currentSpeed = medSpeed;
+  // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
+}
+//******************************************************************************
+
+//******************************************************************************
+// Function to set Stop for the pump, will simulatate button press
+void goStop()
+{
+  digitalWrite(26, HIGH); // Lowspeed button
+  delay(100);
+  digitalWrite(14, HIGH); // Medspeed button
+  delay(100);
+  digitalWrite(27, HIGH); // Highspeed button
+  delay(100);
+  digitalWrite(25, LOW);  //Stop Button
+  delay(500);
+  digitalWrite(25, HIGH);  //Stop Button
+  delay(500);
+  currentSpeed = stop;
+  // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
+}
+//******************************************************************************
+
 
 //******************************************************************************
 // Setup the async server handler functions, and then start the server
@@ -178,6 +269,15 @@ void setupServer()
                 {
                   goHighSpeed();
                 }
+                else if ((p->value() == "MedOff"))
+                {
+                  goMedSpeed();
+                }
+                else if ((p->value() == "StopOff"))
+                {
+                  goStop();
+                }
+              
               }
               else
               {
@@ -234,12 +334,15 @@ void setupServer()
       Serial.println("Got an update reuest");
       if (!request->authenticate(http_username, http_password))
        return request->requestAuthentication();
-      char buffer[100];
+      char buffer[200];
       //Format a json string, with all the data to be updated in the client
-      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\"}", currentRelaxStatus, currentSpeed, onHour, offHour, rssi);
+      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\",\"hh\":\"%02d\",\"mm\":\"%02d\",\"ss\":\"%02d\",\"dd\":\"%02d\",\"md\":\"%02d\",\"yy\":\"%02d\",\"currentTemp\":\"%.2f\"}",currentRelaxStatus, currentSpeed, onHour, offHour, rssi,currentHour,currentMinute,currentSec,currentDay,currentMd,currentYr,currentTemp);
+      
       Serial.print(buffer);
       //Send data to the client
-      request->send(200, "application/json", buffer); });
+      request->send(200, "application/json", buffer); 
+       }
+      );
 
   // Start the server
   server.begin();
@@ -260,8 +363,18 @@ void printLocalTime()
       return;
     }
     previousTime = millis();
+    
+    
     currentHour = timeinfo.tm_hour;
     currentMinute = timeinfo.tm_min;
+    currentSec =timeinfo.tm_sec;
+    currentDay =timeinfo.tm_mday;
+    currentMd=timeinfo.tm_mon;
+    currentYr=timeinfo.tm_year+1900;
+
+    Serial.println(currentHour);
+    Serial.println(currentMinute);
+    Serial.println(currentYr);
     Serial.println(currentHour);
     Serial.println(currentMinute);
   }
@@ -406,14 +519,20 @@ void setup()
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   printLocalTime();
   // Setup digital pins
-  pinMode(27, OUTPUT);
-  pinMode(26, OUTPUT);
+  pinMode(27, OUTPUT);  //HighSpeed button
+  pinMode(26, OUTPUT);  //LowSpeed button
+  pinMode(25, OUTPUT);  //MedSpeed button
+  pinMode(14, OUTPUT);  //Stop button
   pinMode(Push_button_GPIO, INPUT_PULLUP);
-  digitalWrite(26, HIGH); // GIOP27
-  digitalWrite(27, HIGH); // GIOP27
+  digitalWrite(26, HIGH); // LowSpeed Button
+  digitalWrite(27, HIGH); // HighSpeed Button
+  digitalWrite(25, HIGH); // MedSpeed Button
+  digitalWrite(14, HIGH); // Stop Button
   pinMode(LED_BUILTIN, OUTPUT);
 }
 //******************************************************************************
+
+
 
 int value = 0;
 
@@ -444,6 +563,9 @@ void loop()
     if (rssi != 0)
       esp_task_wdt_reset();
 
+
+
+
     LED_state = !LED_state;
     digitalWrite(LED_BUILTIN, LED_state); // turn the LED off by making the voltage LOW
 
@@ -458,15 +580,22 @@ void loop()
       }
     }
   }
+   if((millis() - lastDallasRead) > 10000){
+     digitalWrite(LED_BUILTIN,HIGH);
+         lastDallasRead = millis();
+     currentTemp = getTemperatur(); 
+     currentTemp +=1.5;
+     digitalWrite(LED_BUILTIN, LOW);
+   }
 
   // digitalWrite(LED_BUILTIN, LED_state);
 
   lastbutton_state = data;
 
   // Check if it is time to turn on or off the pump speed
-  if ((currentHour == onHour) && (currentSpeed != highSpeed))
+  if ((currentHour == onHour) && (currentSpeed != medSpeed))
   {
-    goHighSpeed();
+    goMedSpeed();
   }
   if ((currentHour == offHour) && (currentSpeed != lowSpeed))
   {
