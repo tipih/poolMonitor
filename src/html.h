@@ -247,8 +247,10 @@ if (pumpSpeed==0)
 
     document.getElementById("timeOn").innerHTML =timeon ;
     document.getElementById("timeOff").innerHTML =timeoff ; 
-    document.getElementById("rssi").innerHTML =rssi ;
-
+ 
+    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Tid:"+hh+":"+mm+" Dato "+dd+"."+md+"."+yy;
+    document.getElementById("status").innerHTML =pumpSpeed;
+    document.getElementById("status_temp").innerHTML ="Temperatur: "+temperatur;
 
   }
  };
