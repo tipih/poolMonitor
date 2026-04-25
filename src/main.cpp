@@ -20,8 +20,8 @@
 // MQTT Configuration
 #define MQTT_HOST "192.168.0.54"
 #define MQTT_PORT 1883
-#define MQTT_CLIENT_ID "PoolMonitor"
-#define MQTT_TOPIC "pool/monitor"
+#define MQTT_CLIENT_ID "PoolMonitor_Test"
+#define MQTT_TOPIC "pool/monitor/test"
 
 // Manager instances
 WiFiManager wifiManager;
@@ -595,6 +595,12 @@ void loop()
      char statusPayload[8];
      snprintf(statusPayload, sizeof(statusPayload), "%d", currentRelaxStatus);
      mqttManager.publishToSubtopic("status", statusPayload);
+
+     // Publish IP address
+     IPAddress ip = wifiManager.getLocalIP();
+     char ipPayload[16];
+     snprintf(ipPayload, sizeof(ipPayload), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+     mqttManager.publishToSubtopic("ip", ipPayload);
 
      digitalWrite(LED_BUILTIN, LOW);
    }

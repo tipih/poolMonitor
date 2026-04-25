@@ -29,6 +29,9 @@ public:
   // Publish Home Assistant discovery configurations
   void publishHADiscovery();
 
+  // Force republish of HA discovery on next connection
+  void resetDiscovery() { _discoveryPublished = false; }
+
   // Get the PubSubClient instance for advanced usage if needed
   PubSubClient &getClient();
 
@@ -44,6 +47,7 @@ private:
   const char *_password;
 
   unsigned long _lastReconnectAttempt;
+  bool _discoveryPublished;
   static const unsigned long RECONNECT_INTERVAL = 10000; // 10 seconds
 
   // Internal reconnect handler (non-blocking)

@@ -10,6 +10,7 @@ MQTTManager::MQTTManager() : _mqttClient(_espClient)
   _user = nullptr;
   _password = nullptr;
   _lastReconnectAttempt = 0;
+  _discoveryPublished = false;
 }
 
 MQTTManager::~MQTTManager()
@@ -30,6 +31,7 @@ void MQTTManager::begin(const char *host, int port, const char *clientId, const 
   // Configure MQTT client
   _mqttClient.setServer(_host, _port);
   _mqttClient.setBufferSize(512); // Match MQTT_MAX_PACKET_SIZE
+  _mqttClient.setKeepAlive(60);   // Increase keepalive to 60 seconds for stability
 
   Serial.print("MQTT configured for broker: ");
   Serial.print(_host);
@@ -84,8 +86,13 @@ void MQTTManager::reconnect()
       snprintf(topic, sizeof(topic), "%s/command", _baseTopic);
       _mqttClient.subscribe(topic);
 
-      // Publish Home Assistant discovery configs
-      publishHADiscovery();
+      // Publish Home Assistant discovery configs only once
+      if (!_discoveryPublished)
+      {
+        publishHADiscovery();
+        _discoveryPublished = true;
+        delay(100); // Small delay after publishing discovery to avoid overwhelming broker
+      }
     }
     else
     {
@@ -193,6 +200,15 @@ void MQTTManager::publishHADiscovery()
            "\"payload_on\":\"1\",\"payload_off\":\"0\",\"device_class\":\"problem\","
            "\"value_template\":\"{% if value == '1' %}off{% else %}on{% endif %}\","
            "\"unique_id\":\"%s_status\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // IP Address
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_ip/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"IP Address\",\"state_topic\":\"%s/ip\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_ip\","
+           "\"icon\":\"mdi:ip-network\",\"device\":%s}",
            _baseTopic, haId, deviceJson);
   _mqttClient.publish(topic, payload, true);
 
