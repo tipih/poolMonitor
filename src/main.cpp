@@ -7,12 +7,14 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <PubSubClient.h>
 #include "html.h"
 #include "Preferences.h"
 #include <esp_task_wdt.h>
 #include "cred.h"
 #include <DallasTemperature.h>
+#include "WiFiManager.h"
+#include "MQTTManager.h"
+
 #define WDT_TIMEOUT 90
 
 // MQTT Configuration
@@ -21,17 +23,14 @@
 #define MQTT_CLIENT_ID "PoolMonitor"
 #define MQTT_TOPIC "pool/monitor"
 
-// WiFi and MQTT clients
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
-
-// Forward declaration
-void publishMQTT(const char *topic, const char *payload);
+// Manager instances
+WiFiManager wifiManager;
+MQTTManager mqttManager;
 
 const char *ssid = SS_ID;
 const char *password = auth;
-const char *http_username = user;
-const char *http_password = pass;
+const char *http_username = HTTP_USER;
+const char *http_password = HTTP_PASS;
 
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
@@ -92,8 +91,6 @@ const int Push_button_GPIO = 13;
 
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50;
-unsigned long lastMQTTReconnectAttempt = 0;
-const unsigned long MQTT_RECONNECT_INTERVAL = 10000; // 10 seconds between reconnect attempts
 unsigned long lastLEDToggle = 0;
 const unsigned long LED_BLINK_INTERVAL = 500; // Visible LED blink every 500ms
 
@@ -288,22 +285,22 @@ void setupServer()
                 if (p->value() == "LowOff")
                 {
                   goLowSpeed();
-                  publishMQTT((MQTT_TOPIC "/pump_speed"), "Low");
+                  mqttManager.publishToSubtopic("pump_speed", "Low");
                 }
                 else if ((p->value() == "HighOff"))
                 {
                   goHighSpeed();
-                  publishMQTT((MQTT_TOPIC "/pump_speed"), "High");
+                  mqttManager.publishToSubtopic("pump_speed", "High");
                 }
                 else if ((p->value() == "MedOff"))
                 {
                   goMedSpeed();
-                  publishMQTT((MQTT_TOPIC "/pump_speed"), "Medium");
+                  mqttManager.publishToSubtopic("pump_speed", "Medium");
                 }
                 else if ((p->value() == "StopOff"))
                 {
                   goStop();
-                  publishMQTT((MQTT_TOPIC "/pump_speed"), "Stopped");
+                  mqttManager.publishToSubtopic("pump_speed", "Stopped");
                 }
               
               }
@@ -406,168 +403,9 @@ void printLocalTime()
 //******************************************************************************
 
 //******************************************************************************
-// Handler for wifi connection
-void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info)
+// Initialize OTA (Over-The-Air updates)
+void setupOTA()
 {
-  Serial.println("Connected to AP successfully!");
-}
-//******************************************************************************
-
-//******************************************************************************
-// Publish Home Assistant MQTT Discovery Config
-void publishHADiscovery()
-{
-  if (!mqttClient.connected())
-    return;
-
-  const char *haId = "pool_monitor";
-  const char *base = MQTT_TOPIC;
-  
-  // Device object for Home Assistant
-  char deviceJson[256];
-  snprintf(deviceJson, sizeof(deviceJson),
-           "{\"identifiers\":[\"%s\",\"%s\"],\"name\":\"Pool Monitor\"}",
-           haId, MQTT_CLIENT_ID);
-
-  char topic[160];
-  char payload[512];
-
-  // Temperature Sensor
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_temperature/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Pool Temperature\",\"state_topic\":\"%s/temperature\","
-           "\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_temperature\","
-           "\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  // Pump Status (on/off) - Binary Sensor
-  snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_pump_status/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Pool Pump\",\"state_topic\":\"%s/pump_status\","
-           "\"payload_on\":\"on\",\"payload_off\":\"off\",\"device_class\":\"running\","
-           "\"unique_id\":\"%s_pump_status\",\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  // Current Pump Speed
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_pump_speed/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Pump Speed\",\"state_topic\":\"%s/pump_speed\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_pump_speed\","
-           "\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  // WiFi Signal Strength (RSSI)
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_rssi/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"WiFi Signal Strength\",\"state_topic\":\"%s/rssi\","
-           "\"unit_of_measurement\":\"dBm\",\"device_class\":\"signal_strength\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_rssi\","
-           "\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  // Current Pump Speed (continuous)
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_current_speed/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Current Pump Speed\",\"state_topic\":\"%s/current_speed\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_current_speed\","
-           "\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  // Pool Monitor Status (1=ok, 0=error)
-  snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_status/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Pool Monitor Status\",\"state_topic\":\"%s/status\","
-           "\"payload_on\":\"1\",\"payload_off\":\"0\",\"device_class\":\"problem\","
-           "\"value_template\":\"{% if value == '1' %}off{% else %}on{% endif %}\","
-           "\"unique_id\":\"%s_status\",\"device\":%s}",
-           base, haId, deviceJson);
-  mqttClient.publish(topic, payload, true);
-
-  Serial.println("Home Assistant discovery configs published");
-}
-
-//******************************************************************************
-// MQTT Connection Handler (Non-blocking)
-void mqttReconnect()
-{
-  // Only attempt reconnection if we're not connected AND enough time has passed
-  unsigned long currentTime = millis();
-  
-  if (!mqttClient.connected() && (currentTime - lastMQTTReconnectAttempt) >= MQTT_RECONNECT_INTERVAL)
-  {
-    lastMQTTReconnectAttempt = currentTime;
-    Serial.print("Attempting MQTT connection...");
-    
-    // Single non-blocking connection attempt
-    if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS))
-    {
-      Serial.println("connected");
-      // Subscribe to topics if needed
-      char topic[80];
-      snprintf(topic, sizeof(topic), "%s/command", MQTT_TOPIC);
-      mqttClient.subscribe(topic);
-      
-      // Publish Home Assistant discovery configs (without blocking delay)
-      publishHADiscovery();
-    }
-    else
-    {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" - will retry in 10 seconds");
-    }
-  }
-}
-
-//******************************************************************************
-// Publish MQTT message
-void publishMQTT(const char *topic, const char *payload)
-{
-  if (mqttClient.connected())
-  {
-    if (mqttClient.publish(topic, payload))
-    {
-      Serial.print("Published to ");
-      Serial.print(topic);
-      Serial.print(": ");
-      Serial.println(payload);
-    }
-  }
-  else
-  {
-    Serial.println("MQTT not connected, cannot publish");
-  }
-}
-
-//******************************************************************************
-
-//******************************************************************************
-// Handler for wifi got an IP adress, when IP is ok, get the network time, and
-// setup the server
-// When server is running also start the OTA, and setup the OTA handlers
-
-void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
-{
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  // Setup MQTT (non-blocking, will attempt connection in main loop)
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  lastMQTTReconnectAttempt = 0; // Reset timer to attempt connection soon
-
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  printLocalTime();
-  setupServer();
-  server.begin();
-  Serial.println("Server started");
-
   // Port defaults to 3232
   // ArduinoOTA.setPort(3232);
 
@@ -608,29 +446,7 @@ void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
   // Now start the OTA listner.
   ArduinoOTA.begin();
 
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-}
-//******************************************************************************
-
-//******************************************************************************
-// Handler for wifi disconnect
-// If this happen, store a reset counter and reset the ESP
-void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
-{
-  Serial.println("Disconnected from WiFi access point");
-  Serial.print("WiFi lost connection. Reason: ");
-  Serial.println(info.wifi_sta_disconnected.reason);
-  Serial.println("Trying to Reconnect");
-  preferences.begin("reset", false);
-  resetcounter++;
-  preferences.putLong("resetCounter", resetcounter);
-  preferences.end();
-  // WiFi.begin(ssid, password);
-  // Let reset the ESP, to get to a known state
-  delay(2000);
-  ESP.restart();
+  Serial.println("OTA Ready");
 }
 //******************************************************************************
 
@@ -638,12 +454,7 @@ void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 // Arduino main setup function
 void setup()
 {
-  // Init the NVM setup
-  preferences.begin("reset", false);
-  resetcounter = preferences.getLong("resetCounter", resetcounter);
-  preferences.end();
-
-  // Init watchdog handler, timeout is set to 45 sec
+  // Init watchdog handler
   esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);               // add current thread to WDT watch
 
@@ -651,33 +462,30 @@ void setup()
   Serial.begin(115200);
   delay(500);
 
-  // Print out the reset counter
-  Serial.print("Reset cnt=");
-  Serial.println(resetcounter);
-  // We start by connecting to a WiFi network
-
-  Serial.println();
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  // Get the data from NVM
+  // Get preferences from NVM
   getPreference();
-  // Start the WIFI
-  WiFi.begin(ssid, password);
 
-  // Define the wifi callback functions
-  WiFi.onEvent(WiFiStationConnected, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
-  WiFi.onEvent(WiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(WiFiStationDisconnected, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
-  Serial.println();
-  Serial.println();
-  Serial.println("Wait for WiFi... ");
+  // Initialize WiFi Manager
+  wifiManager.begin(ssid, password, &preferences);
+
+  // Initialize MQTT Manager
+  mqttManager.begin(MQTT_HOST, MQTT_PORT, MQTT_CLIENT_ID, MQTT_TOPIC, MQTT_USER, MQTT_PASS);
+
+  // Wait for WiFi connection
   delay(3000);
 
-  // init and get the time
+  // Init and get the time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   printLocalTime();
+
+  // Setup web server
+  setupServer();
+  server.begin();
+  Serial.println("Web server started");
+
+  // Setup OTA
+  setupOTA();
+
   // Setup digital pins
   pinMode(27, OUTPUT);  //HighSpeed button
   pinMode(26, OUTPUT);  //LowSpeed button
@@ -689,6 +497,8 @@ void setup()
   digitalWrite(25, HIGH); // MedSpeed Button
   digitalWrite(14, HIGH); // Stop Button
   pinMode(LED_BUILTIN, OUTPUT);
+
+  Serial.println("Setup complete!");
 }
 //******************************************************************************
 
@@ -705,15 +515,9 @@ void loop()
   ArduinoOTA.handle();
 
   // Handle MQTT connection (non-blocking with timeout interval)
-  if (WiFi.isConnected())
+  if (wifiManager.isConnected())
   {
-    // Non-blocking MQTT reconnect with 10-second interval
-    mqttReconnect();
-    // Only process MQTT if connected (non-blocking)
-    if (mqttClient.connected())
-    {
-      mqttClient.loop();
-    }
+    mqttManager.handle();
   }
 
   // Get the time
@@ -731,7 +535,7 @@ void loop()
   if ((millis() - lastDebounceTime) > debounceDelay)
   {
     // Get the wifi rssi, this is used to kick the HW watchdog
-    rssi = WiFi.RSSI();
+    rssi = wifiManager.getRSSI();
 
     // Check if rssi reading is ok, if not the do not kick the HW watchdog
     if (rssi != 0)
@@ -765,23 +569,17 @@ void loop()
      currentTemp +=1.5;
 
      // Publish temperature to MQTT
-     char tempTopic[80];
      char tempPayload[32];
-     snprintf(tempTopic, sizeof(tempTopic), "%s/temperature", MQTT_TOPIC);
      snprintf(tempPayload, sizeof(tempPayload), "%.2f", currentTemp);
-     publishMQTT(tempTopic, tempPayload);
+     mqttManager.publishToSubtopic("temperature", tempPayload);
 
      // Publish RSSI (WiFi signal strength)
-     char rssiTopic[80];
      char rssiPayload[16];
-     snprintf(rssiTopic, sizeof(rssiTopic), "%s/rssi", MQTT_TOPIC);
      snprintf(rssiPayload, sizeof(rssiPayload), "%d", rssi);
-     publishMQTT(rssiTopic, rssiPayload);
+     mqttManager.publishToSubtopic("rssi", rssiPayload);
 
      // Publish current pump speed
-     char speedTopic[80];
      char speedPayload[16];
-     snprintf(speedTopic, sizeof(speedTopic), "%s/current_speed", MQTT_TOPIC);
      const char *speedStr = "unknown";
      switch(currentSpeed) {
        case lowSpeed: speedStr = "Low"; break;
@@ -791,14 +589,12 @@ void loop()
        case noSpeed: speedStr = "None"; break;
      }
      snprintf(speedPayload, sizeof(speedPayload), "%s", speedStr);
-     publishMQTT(speedTopic, speedPayload);
+     mqttManager.publishToSubtopic("current_speed", speedPayload);
 
      // Publish pool relax status (1 = ok, 0 = error)
-     char statusTopic[80];
      char statusPayload[8];
-     snprintf(statusTopic, sizeof(statusTopic), "%s/status", MQTT_TOPIC);
      snprintf(statusPayload, sizeof(statusPayload), "%d", currentRelaxStatus);
-     publishMQTT(statusTopic, statusPayload);
+     mqttManager.publishToSubtopic("status", statusPayload);
 
      digitalWrite(LED_BUILTIN, LOW);
    }
@@ -816,20 +612,12 @@ void loop()
     if ((currentHour == onHour) && (currentSpeed != medSpeed))
     {
       goMedSpeed();
-      
-      // Publish pump status
-      char speedTopic[80];
-      snprintf(speedTopic, sizeof(speedTopic), "%s/pump_speed", MQTT_TOPIC);
-      publishMQTT(speedTopic, "Medium");
+      mqttManager.publishToSubtopic("pump_speed", "Medium");
     }
     if ((currentHour == offHour) && (currentSpeed != lowSpeed))
     {
       goLowSpeed();
-      
-      // Publish pump status
-      char speedTopic[80];
-      snprintf(speedTopic, sizeof(speedTopic), "%s/pump_speed", MQTT_TOPIC);
-      publishMQTT(speedTopic, "Low");
+      mqttManager.publishToSubtopic("pump_speed", "Low");
     }
   }
 }
