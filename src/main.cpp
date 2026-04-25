@@ -23,6 +23,21 @@
 #define MQTT_CLIENT_ID "PoolMonitor_Test"
 #define MQTT_TOPIC "pool/monitor/test"
 
+// GPIO Pin Definitions
+#define GPIO_HIGH_SPEED 27
+#define GPIO_LOW_SPEED 26
+#define GPIO_STOP 25
+#define GPIO_MED_SPEED 14
+#define GPIO_BUTTON 13
+#define GPIO_ONE_WIRE 4
+
+// Timing Constants
+#define TEMP_READ_INTERVAL 10000     // Temperature reading interval (ms)
+#define TEMP_CALIBRATION_OFFSET 1.5  // Temperature calibration offset
+#define PUMP_CHECK_INTERVAL 500      // Pump schedule check interval (ms)
+#define LED_BLINK_INTERVAL 500       // LED blink interval (ms)
+#define DEBOUNCE_DELAY 50            // Button debounce delay (ms)
+
 // Manager instances
 WiFiManager wifiManager;
 MQTTManager mqttManager;
@@ -35,8 +50,6 @@ const char *http_password = HTTP_PASS;
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
-const long timeoutTime = 2000;
-const long ledSpeed = 500;
 
 unsigned long currentSec = 1;
 unsigned long currentDay = 1;
@@ -44,28 +57,17 @@ unsigned long currentMd = 1;
 unsigned long currentYr = 1;
 unsigned long currentHour = 1;
 unsigned long currentMinute = 1;
-//unsigned long currentSec = 1;
-//unsigned long currentDay = 1;
-//unsigned long currentMd = 1;
-//unsigned long currentYr = 1;
 
-
-unsigned long currentTime = millis();
 unsigned long previousTime = 0;
 unsigned long onHour = 6;
 unsigned long offHour = 17;
-unsigned long resetcounter = 0;
 signed int rssi = 0;
 int currentRelaxStatus = 0;
 
-const char *input_parameter = "state";
 float currentTemp = -999;
-const int output = 14;
 
-// Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS 4
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-OneWire oneWire(ONE_WIRE_BUS);
+// Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(GPIO_ONE_WIRE);
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
 unsigned long lastDallasRead = millis();
@@ -87,12 +89,8 @@ int LED_state = LOW;
 int button_state;
 int lastbutton_state = LOW;
 
-const int Push_button_GPIO = 13;
-
 unsigned long lastDebounceTime = 0;
-unsigned long debounceDelay = 50;
 unsigned long lastLEDToggle = 0;
-const unsigned long LED_BLINK_INTERVAL = 500; // Visible LED blink every 500ms
 
 AsyncWebServer server(80);
 
@@ -142,16 +140,12 @@ float getTemperatur()
     Serial.print("Temperature for the device 1 (index 0) is: ");
     Serial.println(tempC);
     return tempC;
-
   }
   else
   {
     Serial.println("Error: Could not read temperature data");
     return -999;
   }
-
-
-
 }
 //******************************************************************************
 
@@ -168,79 +162,75 @@ void setOnOffTime(unsigned long ontime, unsigned long offtime)
 //******************************************************************************
 
 //******************************************************************************
-// Function to set Low speed for the pump, will simulatate button press
+// Function to set Low speed for the pump, will simulate button press
 void goLowSpeed()
 {
-  digitalWrite(27, HIGH); // HignSpeed button
+  digitalWrite(GPIO_HIGH_SPEED, HIGH);
   delay(100);
-  digitalWrite(14, HIGH); // MedSpeed button
+  digitalWrite(GPIO_MED_SPEED, HIGH);
   delay(100);
-  digitalWrite(25, HIGH); // Stop button
+  digitalWrite(GPIO_STOP, HIGH);
   delay(100);
-  digitalWrite(26, LOW);  //Low Speed button
+  digitalWrite(GPIO_LOW_SPEED, LOW);
   delay(500);
-  digitalWrite(26, HIGH);  //Low speed button
+  digitalWrite(GPIO_LOW_SPEED, HIGH);
   delay(500);
   currentSpeed = lowSpeed;
-  // digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
 
 
 //******************************************************************************
-// Function to set Hihg speed for the pump, will simulatate button press
+// Function to set High speed for the pump, will simulate button press
 void goHighSpeed()
 {
-  digitalWrite(26, HIGH); // HighSpeed Button 
+  digitalWrite(GPIO_LOW_SPEED, HIGH);
   delay(100);
-  digitalWrite(14, HIGH); // MedSpeed button
+  digitalWrite(GPIO_MED_SPEED, HIGH);
   delay(100);
-  digitalWrite(25, HIGH); // Stop button
+  digitalWrite(GPIO_STOP, HIGH);
   delay(100);
-  digitalWrite(27, LOW);  //High Speed button
+  digitalWrite(GPIO_HIGH_SPEED, LOW);
   delay(500);
-  digitalWrite(27, HIGH);  //HighSpeed button
+  digitalWrite(GPIO_HIGH_SPEED, HIGH);
   delay(500);
   currentSpeed = highSpeed;
-  // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
 
 //******************************************************************************
-// Function to set Med speed for the pump, will simulatate button press
+// Function to set Med speed for the pump, will simulate button press
 void goMedSpeed()
 {
-  digitalWrite(26, HIGH); // Lowspeed button
+  digitalWrite(GPIO_LOW_SPEED, HIGH);
   delay(100);
-  digitalWrite(25, HIGH); // Stop button
+  digitalWrite(GPIO_STOP, HIGH);
   delay(100);
-  digitalWrite(27, HIGH); // Highspeed button
+  digitalWrite(GPIO_HIGH_SPEED, HIGH);
   delay(100);
-  digitalWrite(14, LOW);  // Medspeed button
+  digitalWrite(GPIO_MED_SPEED, LOW);
   delay(500);
-  digitalWrite(14, HIGH);  //Medspeed button
+  digitalWrite(GPIO_MED_SPEED, HIGH);
   delay(500);
   currentSpeed = medSpeed;
-  // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
 
 //******************************************************************************
-// Function to set Stop for the pump, will simulatate button press
+// Function to set Stop for the pump, will simulate button press
 void goStop()
 {
-  digitalWrite(26, HIGH); // Lowspeed button
+  digitalWrite(GPIO_LOW_SPEED, HIGH);
   delay(100);
-  digitalWrite(14, HIGH); // Medspeed button
+  digitalWrite(GPIO_MED_SPEED, HIGH);
   delay(100);
-  digitalWrite(27, HIGH); // Highspeed button
+  digitalWrite(GPIO_HIGH_SPEED, HIGH);
   delay(100);
-  digitalWrite(25, LOW);  //Stop Button
+  digitalWrite(GPIO_STOP, LOW);
   delay(500);
-  digitalWrite(25, HIGH);  //Stop Button
+  digitalWrite(GPIO_STOP, HIGH);
   delay(500);
   currentSpeed = stop;
-  // digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
 }
 //******************************************************************************
 
@@ -262,9 +252,9 @@ void setupServer()
   // Handler to for logged out page, send it
   server.on("/logged-out", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/html", logout_html); });
-  // Handler for the update request, check og auth is ok
+  // Handler for the update request, check if auth is ok
   // if ok get the input params, and check the values
-  // change the pumpspeed according the the button pressed
+  // change the pumpspeed according to the button pressed
   // and send ok back to client
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -353,10 +343,10 @@ void setupServer()
   request->send(200, "text/plain", "OK"); });
 
   // Handler to state update
-  // Check if client is auth, if ok the send values to client in a json format
+  // Check if client is auth, if ok then send values to client in a json format
   server.on("/state", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-      Serial.println("Got an update reuest");
+      Serial.println("Got an update request");
       if (!request->authenticate(http_username, http_password))
        return request->requestAuthentication();
       char buffer[200];
@@ -487,24 +477,21 @@ void setup()
   setupOTA();
 
   // Setup digital pins
-  pinMode(27, OUTPUT);  //HighSpeed button
-  pinMode(26, OUTPUT);  //LowSpeed button
-  pinMode(25, OUTPUT);  //MedSpeed button
-  pinMode(14, OUTPUT);  //Stop button
-  pinMode(Push_button_GPIO, INPUT_PULLUP);
-  digitalWrite(26, HIGH); // LowSpeed Button
-  digitalWrite(27, HIGH); // HighSpeed Button
-  digitalWrite(25, HIGH); // MedSpeed Button
-  digitalWrite(14, HIGH); // Stop Button
+  pinMode(GPIO_HIGH_SPEED, OUTPUT);
+  pinMode(GPIO_LOW_SPEED, OUTPUT);
+  pinMode(GPIO_STOP, OUTPUT);
+  pinMode(GPIO_MED_SPEED, OUTPUT);
+  pinMode(GPIO_BUTTON, INPUT_PULLUP);
+  digitalWrite(GPIO_LOW_SPEED, HIGH);
+  digitalWrite(GPIO_HIGH_SPEED, HIGH);
+  digitalWrite(GPIO_STOP, HIGH);
+  digitalWrite(GPIO_MED_SPEED, HIGH);
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.println("Setup complete!");
 }
 //******************************************************************************
 
-
-
-int value = 0;
 unsigned long lastLoopDelay = 0;
 
 //******************************************************************************
@@ -523,16 +510,15 @@ void loop()
   // Get the time
   printLocalTime();
 
-  // Read in status from poolrelax
-  int data = digitalRead(Push_button_GPIO);
-  //currentRelaxStatus = data;
+  // Read in status from pool relax
+  int data = digitalRead(GPIO_BUTTON);
   if (data != lastbutton_state)
   {
     // reset the debouncing timer
     lastDebounceTime = millis();
   }
 
-  if ((millis() - lastDebounceTime) > debounceDelay)
+  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY)
   {
     // Get the wifi rssi, this is used to kick the HW watchdog
     rssi = wifiManager.getRSSI();
@@ -562,11 +548,12 @@ void loop()
     LED_state = !LED_state;
     digitalWrite(LED_BUILTIN, LED_state);
   }
-   if((millis() - lastDallasRead) > 10000){
+
+  if((millis() - lastDallasRead) > TEMP_READ_INTERVAL){
      digitalWrite(LED_BUILTIN,HIGH);
          lastDallasRead = millis();
      currentTemp = getTemperatur(); 
-     currentTemp +=1.5;
+     currentTemp += TEMP_CALIBRATION_OFFSET;
 
      // Publish temperature to MQTT
      char tempPayload[32];
@@ -605,12 +592,10 @@ void loop()
      digitalWrite(LED_BUILTIN, LOW);
    }
 
-  // digitalWrite(LED_BUILTIN, LED_state);
-
   lastbutton_state = data;
 
   // Check if it is time to turn on or off the pump speed (every 500ms)
-  if ((millis() - lastLoopDelay) >= 500)
+  if ((millis() - lastLoopDelay) >= PUMP_CHECK_INTERVAL)
   {
     lastLoopDelay = millis();
 
