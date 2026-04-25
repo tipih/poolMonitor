@@ -1,8 +1,6 @@
 #include <Arduino.h>
 
 #include <WiFi.h>
-#include "AsyncTCP.h"
-#include <ESPAsyncWebServer.h>
 #include "time.h"
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
@@ -16,6 +14,7 @@
 #include "TemperatureSensor.h"
 #include "ScheduleManager.h"
 #include "OTAManager.h"
+#include "WebServerManager.h"
 
 #define WDT_TIMEOUT 90
 
@@ -47,6 +46,7 @@ PumpController pumpController;
 TemperatureSensor temperatureSensor;
 ScheduleManager scheduleManager;
 OTAManager otaManager;
+WebServerManager webServerManager(pumpController, mqttManager, scheduleManager, temperatureSensor);
 
 const char *ssid = SS_ID;
 const char *password = auth;
@@ -77,8 +77,6 @@ int lastbutton_state = LOW;
 
 unsigned long lastDebounceTime = 0;
 unsigned long lastLEDToggle = 0;
-
-AsyncWebServer server(80);
 
 //******************************************************************************
 // Publish all sensor data to MQTT
@@ -112,131 +110,6 @@ void publishStatusToMQTT()
 }
 //******************************************************************************
 
-//******************************************************************************
-// Web server handlers
-//******************************************************************************
-
-// Handler for root page - show main interface
-void handleRoot(AsyncWebServerRequest *request)
-{
-  if (!request->authenticate(http_username, http_password))
-    return request->requestAuthentication();
-  request->send_P(200, "text/html", index_html);
-}
-
-// Handler for logout
-void handleLogout(AsyncWebServerRequest *request)
-{
-  request->send(401);
-}
-
-// Handler for logged out page
-void handleLoggedOut(AsyncWebServerRequest *request)
-{
-  request->send_P(200, "text/html", logout_html);
-}
-
-// Handler for pump control updates
-void handleUpdate(AsyncWebServerRequest *request)
-{
-  Serial.println("Got an update");
-  if (!request->authenticate(http_username, http_password))
-    return request->requestAuthentication();
-
-  if (request->params() == 1)
-  {
-    AsyncWebParameter *p = request->getParam(0);
-    String value = p->value();
-
-    Serial.print("Button: ");
-    Serial.println(value);
-
-    if (value == "LowOff")
-    {
-      pumpController.setLowSpeed();
-      mqttManager.publishToSubtopic("pump_speed", "Low");
-    }
-    else if (value == "HighOff")
-    {
-      pumpController.setHighSpeed();
-      mqttManager.publishToSubtopic("pump_speed", "High");
-    }
-    else if (value == "MedOff")
-    {
-      pumpController.setMedSpeed();
-      mqttManager.publishToSubtopic("pump_speed", "Medium");
-    }
-    else if (value == "StopOff")
-    {
-      pumpController.setStop();
-      mqttManager.publishToSubtopic("pump_speed", "Stopped");
-    }
-  }
-
-  request->send(200, "text/plain", "OK");
-}
-
-// Handler for time schedule adjustments
-void handleTimeAdjust(AsyncWebServerRequest *request)
-{
-  Serial.println("Got a time update");
-  if (!request->authenticate(http_username, http_password))
-    return request->requestAuthentication();
-
-  if (request->params() > 1)
-  {
-    unsigned long onTime = request->getParam(0)->value().toInt();
-    unsigned long offTime = request->getParam(1)->value().toInt();
-
-    Serial.print("New schedule: ON=");
-    Serial.print(onTime);
-    Serial.print(", OFF=");
-    Serial.println(offTime);
-
-    scheduleManager.setSchedule(onTime, offTime);
-  }
-
-  request->send(200, "text/plain", "OK");
-}
-
-// Handler for state polling
-void handleState(AsyncWebServerRequest *request)
-{
-  Serial.println("Got a state request");
-  if (!request->authenticate(http_username, http_password))
-    return request->requestAuthentication();
-
-  char buffer[200];
-  sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%lu\",\"offTime\":\"%lu\",\"rssi\":\"%d\",\"hh\":\"%02lu\",\"mm\":\"%02lu\",\"ss\":\"%02lu\",\"dd\":\"%02lu\",\"md\":\"%02lu\",\"yy\":\"%02lu\",\"currentTemp\":\"%.2f\"}",
-          currentRelaxStatus,
-          pumpController.getCurrentSpeed(),
-          scheduleManager.getOnHour(),
-          scheduleManager.getOffHour(),
-          rssi,
-          currentHour,
-          currentMinute,
-          currentSec,
-          currentDay,
-          currentMd,
-          currentYr,
-          temperatureSensor.getTemperature());
-
-  request->send(200, "application/json", buffer);
-}
-
-//******************************************************************************
-// Setup the async server handler functions, and then start the server
-void setupServer()
-{
-  server.on("/", HTTP_GET, handleRoot);
-  server.on("/logout", HTTP_GET, handleLogout);
-  server.on("/logged-out", HTTP_GET, handleLoggedOut);
-  server.on("/update", HTTP_GET, handleUpdate);
-  server.on("/timeAdjust", HTTP_GET, handleTimeAdjust);
-  server.on("/state", HTTP_GET, handleState);
-
-  server.begin();
-}
 //******************************************************************************
 
 //******************************************************************************
@@ -300,9 +173,9 @@ void setup()
   printLocalTime();
 
   // Setup web server
-  setupServer();
-  server.begin();
-  Serial.println("Web server started");
+  webServerManager.begin(http_username, http_password);
+  webServerManager.setReferences(&currentRelaxStatus, &rssi, &currentHour, &currentMinute, &currentSec,
+                                  &currentDay, &currentMd, &currentYr);
 
   // Initialize OTA Manager
   otaManager.begin();
