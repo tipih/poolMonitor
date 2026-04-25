@@ -18,8 +18,15 @@
 // MQTT Configuration
 #define MQTT_HOST "192.168.0.54"
 #define MQTT_PORT 1883
-#define MQTT_CLIENT_ID "PoolMonitor_Test"
-#define MQTT_TOPIC "pool/monitor/test"
+
+// MQTT_CLIENT_ID and MQTT_TOPIC are defined in platformio.ini build_flags
+// Defaults for local development:
+#ifndef MQTT_CLIENT_ID
+  #define MQTT_CLIENT_ID "PoolMonitor_Dev"
+#endif
+#ifndef MQTT_TOPIC
+  #define MQTT_TOPIC "pool/monitor/dev"
+#endif
 
 // GPIO Pin Definitions
 #define GPIO_HIGH_SPEED 27
