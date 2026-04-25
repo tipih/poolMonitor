@@ -1,5 +1,5 @@
-#ifndef INPUTMANAGER_H
-#define INPUTMANAGER_H
+#ifndef INPUT_MANAGER_H
+#define INPUT_MANAGER_H
 
 #include <Arduino.h>
 
@@ -28,4 +28,4 @@ private:
   unsigned long _lastLEDToggle;
 };
 
-#endif
+#endif // INPUT_MANAGER_H

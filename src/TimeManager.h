@@ -1,5 +1,5 @@
-#ifndef TIMEMANAGER_H
-#define TIMEMANAGER_H
+#ifndef TIME_MANAGER_H
+#define TIME_MANAGER_H
 
 #include <Arduino.h>
 #include "time.h"
@@ -30,4 +30,4 @@ private:
   unsigned long _previousTime;
 };
 
-#endif
+#endif // TIME_MANAGER_H

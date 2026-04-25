@@ -1,5 +1,5 @@
-#ifndef WEBSERVERMANAGER_H
-#define WEBSERVERMANAGER_H
+#ifndef WEB_SERVER_MANAGER_H
+#define WEB_SERVER_MANAGER_H
 
 #include <ESPAsyncWebServer.h>
 
@@ -43,4 +43,4 @@ private:
   void handleState(AsyncWebServerRequest *request);
 };
 
-#endif
+#endif // WEB_SERVER_MANAGER_H

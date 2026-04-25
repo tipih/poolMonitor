@@ -10,6 +10,17 @@ TemperatureSensor::TemperatureSensor()
     _initialized(false) {
 }
 
+TemperatureSensor::~TemperatureSensor() {
+  if (_sensors) {
+    delete _sensors;
+    _sensors = nullptr;
+  }
+  if (_oneWire) {
+    delete _oneWire;
+    _oneWire = nullptr;
+  }
+}
+
 void TemperatureSensor::begin(uint8_t oneWirePin, float calibrationOffset) {
   _pin = oneWirePin;
   _calibrationOffset = calibrationOffset;

@@ -9,6 +9,9 @@ class TemperatureSensor {
 public:
   // Constructor
   TemperatureSensor();
+  
+  // Destructor
+  ~TemperatureSensor();
 
   // Initialize sensor with OneWire pin
   void begin(uint8_t oneWirePin, float calibrationOffset = 0.0);
@@ -35,4 +38,4 @@ private:
   bool _initialized;
 };
 
-#endif // TEMPERATURE_SENSOR_H
+#endif // TEMPERATURE_SENSOR_H // TEMPERATURE_SENSOR_H

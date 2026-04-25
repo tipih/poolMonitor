@@ -1,10 +1,5 @@
 #include <Arduino.h>
-
 #include <WiFi.h>
-#include "time.h"
-#include <ESPmDNS.h>
-#include <WiFiUdp.h>
-#include "html.h"
 #include "Preferences.h"
 #include <esp_task_wdt.h>
 #include "cred.h"
@@ -173,7 +168,7 @@ void loop()
   if (rssi != 0)
     esp_task_wdt_reset();
 
-  if((millis() - lastDallasRead) > TEMP_READ_INTERVAL){
+  if ((millis() - lastDallasRead) > TEMP_READ_INTERVAL) {
      lastDallasRead = millis();
      
      // Read temperature from sensor
