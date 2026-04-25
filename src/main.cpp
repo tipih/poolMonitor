@@ -14,6 +14,7 @@
 #include <DallasTemperature.h>
 #include "WiFiManager.h"
 #include "MQTTManager.h"
+#include "PumpController.h"
 
 #define WDT_TIMEOUT 90
 
@@ -41,6 +42,7 @@
 // Manager instances
 WiFiManager wifiManager;
 MQTTManager mqttManager;
+PumpController pumpController;
 
 const char *ssid = SS_ID;
 const char *password = auth;
@@ -73,16 +75,6 @@ DallasTemperature sensors(&oneWire);
 unsigned long lastDallasRead = millis();
 
 Preferences preferences;
-
-typedef enum
-{
-  lowSpeed,
-  highSpeed,
-  noSpeed,
-  medSpeed,
-  stop
-} pumpSpeed;
-pumpSpeed currentSpeed = noSpeed;
 
 // Variables will change:
 int LED_state = LOW;
@@ -161,78 +153,7 @@ void setOnOffTime(unsigned long ontime, unsigned long offtime)
 }
 //******************************************************************************
 
-//******************************************************************************
-// Function to set Low speed for the pump, will simulate button press
-void goLowSpeed()
-{
-  digitalWrite(GPIO_HIGH_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_MED_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_STOP, HIGH);
-  delay(100);
-  digitalWrite(GPIO_LOW_SPEED, LOW);
-  delay(500);
-  digitalWrite(GPIO_LOW_SPEED, HIGH);
-  delay(500);
-  currentSpeed = lowSpeed;
-}
-//******************************************************************************
 
-
-//******************************************************************************
-// Function to set High speed for the pump, will simulate button press
-void goHighSpeed()
-{
-  digitalWrite(GPIO_LOW_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_MED_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_STOP, HIGH);
-  delay(100);
-  digitalWrite(GPIO_HIGH_SPEED, LOW);
-  delay(500);
-  digitalWrite(GPIO_HIGH_SPEED, HIGH);
-  delay(500);
-  currentSpeed = highSpeed;
-}
-//******************************************************************************
-
-//******************************************************************************
-// Function to set Med speed for the pump, will simulate button press
-void goMedSpeed()
-{
-  digitalWrite(GPIO_LOW_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_STOP, HIGH);
-  delay(100);
-  digitalWrite(GPIO_HIGH_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_MED_SPEED, LOW);
-  delay(500);
-  digitalWrite(GPIO_MED_SPEED, HIGH);
-  delay(500);
-  currentSpeed = medSpeed;
-}
-//******************************************************************************
-
-//******************************************************************************
-// Function to set Stop for the pump, will simulate button press
-void goStop()
-{
-  digitalWrite(GPIO_LOW_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_MED_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_HIGH_SPEED, HIGH);
-  delay(100);
-  digitalWrite(GPIO_STOP, LOW);
-  delay(500);
-  digitalWrite(GPIO_STOP, HIGH);
-  delay(500);
-  currentSpeed = stop;
-}
-//******************************************************************************
 
 
 //******************************************************************************
@@ -274,22 +195,22 @@ void setupServer()
                 Serial.println(p->value());
                 if (p->value() == "LowOff")
                 {
-                  goLowSpeed();
+                  pumpController.setLowSpeed();
                   mqttManager.publishToSubtopic("pump_speed", "Low");
                 }
                 else if ((p->value() == "HighOff"))
                 {
-                  goHighSpeed();
+                  pumpController.setHighSpeed();
                   mqttManager.publishToSubtopic("pump_speed", "High");
                 }
                 else if ((p->value() == "MedOff"))
                 {
-                  goMedSpeed();
+                  pumpController.setMedSpeed();
                   mqttManager.publishToSubtopic("pump_speed", "Medium");
                 }
                 else if ((p->value() == "StopOff"))
                 {
-                  goStop();
+                  pumpController.setStop();
                   mqttManager.publishToSubtopic("pump_speed", "Stopped");
                 }
               
@@ -351,7 +272,7 @@ void setupServer()
        return request->requestAuthentication();
       char buffer[200];
       //Format a json string, with all the data to be updated in the client
-      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\",\"hh\":\"%02d\",\"mm\":\"%02d\",\"ss\":\"%02d\",\"dd\":\"%02d\",\"md\":\"%02d\",\"yy\":\"%02d\",\"currentTemp\":\"%.2f\"}",currentRelaxStatus, currentSpeed, onHour, offHour, rssi,currentHour,currentMinute,currentSec,currentDay,currentMd,currentYr,currentTemp);
+      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\",\"hh\":\"%02d\",\"mm\":\"%02d\",\"ss\":\"%02d\",\"dd\":\"%02d\",\"md\":\"%02d\",\"yy\":\"%02d\",\"currentTemp\":\"%.2f\"}",currentRelaxStatus, pumpController.getCurrentSpeed(), onHour, offHour, rssi,currentHour,currentMinute,currentSec,currentDay,currentMd,currentYr,currentTemp);
       
       Serial.print(buffer);
       //Send data to the client
@@ -476,16 +397,11 @@ void setup()
   // Setup OTA
   setupOTA();
 
+  // Initialize pump controller
+  pumpController.begin(GPIO_HIGH_SPEED, GPIO_LOW_SPEED, GPIO_MED_SPEED, GPIO_STOP);
+
   // Setup digital pins
-  pinMode(GPIO_HIGH_SPEED, OUTPUT);
-  pinMode(GPIO_LOW_SPEED, OUTPUT);
-  pinMode(GPIO_STOP, OUTPUT);
-  pinMode(GPIO_MED_SPEED, OUTPUT);
   pinMode(GPIO_BUTTON, INPUT_PULLUP);
-  digitalWrite(GPIO_LOW_SPEED, HIGH);
-  digitalWrite(GPIO_HIGH_SPEED, HIGH);
-  digitalWrite(GPIO_STOP, HIGH);
-  digitalWrite(GPIO_MED_SPEED, HIGH);
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.println("Setup complete!");
@@ -567,15 +483,7 @@ void loop()
 
      // Publish current pump speed
      char speedPayload[16];
-     const char *speedStr = "unknown";
-     switch(currentSpeed) {
-       case lowSpeed: speedStr = "Low"; break;
-       case highSpeed: speedStr = "High"; break;
-       case medSpeed: speedStr = "Medium"; break;
-       case stop: speedStr = "Stopped"; break;
-       case noSpeed: speedStr = "None"; break;
-     }
-     snprintf(speedPayload, sizeof(speedPayload), "%s", speedStr);
+     snprintf(speedPayload, sizeof(speedPayload), "%s", pumpController.getSpeedString());
      mqttManager.publishToSubtopic("current_speed", speedPayload);
 
      // Publish pool relax status (1 = ok, 0 = error)
@@ -600,14 +508,14 @@ void loop()
     lastLoopDelay = millis();
 
     // Check if it is time to turn on or off the pump speed
-    if ((currentHour == onHour) && (currentSpeed != medSpeed))
+    if ((currentHour == onHour) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
     {
-      goMedSpeed();
+      pumpController.setMedSpeed();
       mqttManager.publishToSubtopic("pump_speed", "Medium");
     }
-    if ((currentHour == offHour) && (currentSpeed != lowSpeed))
+    if ((currentHour == offHour) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
     {
-      goLowSpeed();
+      pumpController.setLowSpeed();
       mqttManager.publishToSubtopic("pump_speed", "Low");
     }
   }
