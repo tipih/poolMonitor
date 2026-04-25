@@ -8,6 +8,8 @@ class PumpController;
 class MQTTManager;
 class ScheduleManager;
 class TemperatureSensor;
+class TimeManager;
+class InputManager;
 
 class WebServerManager
 {
@@ -15,8 +17,7 @@ public:
   WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp);
 
   void begin(const char *username, const char *password);
-  void setReferences(int *relax, int *rssi, unsigned long *hour, unsigned long *minute, unsigned long *sec,
-                     unsigned long *day, unsigned long *md, unsigned long *yr);
+  void setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, int *rssi);
 
 private:
   AsyncWebServer _server;
@@ -28,15 +29,10 @@ private:
   const char *_httpUsername;
   const char *_httpPassword;
 
-  // References to global variables needed for state
-  int *_currentRelaxStatus;
+  // References to managers for state
+  TimeManager *_timeManager;
+  InputManager *_inputManager;
   int *_rssi;
-  unsigned long *_currentHour;
-  unsigned long *_currentMinute;
-  unsigned long *_currentSec;
-  unsigned long *_currentDay;
-  unsigned long *_currentMd;
-  unsigned long *_currentYr;
 
   // Handler methods
   void handleRoot(AsyncWebServerRequest *request);

@@ -4,6 +4,10 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+// Forward declarations
+class PumpController;
+class MQTTManager;
+
 class ScheduleManager {
 public:
   // Constructor
@@ -25,6 +29,9 @@ public:
 
   // Validate schedule hours
   bool isValidSchedule(unsigned long onHour, unsigned long offHour) const;
+
+  // Check and execute schedule based on current hour
+  void checkAndExecute(unsigned long currentHour, PumpController &pumpController, MQTTManager &mqttManager);
 
 private:
   unsigned long _onHour;

@@ -1,4 +1,6 @@
 #include "ScheduleManager.h"
+#include "PumpController.h"
+#include "MQTTManager.h"
 
 ScheduleManager::ScheduleManager()
   : _onHour(6),
@@ -66,4 +68,20 @@ void ScheduleManager::saveToNVM() {
 
 bool ScheduleManager::isValidSchedule(unsigned long onHour, unsigned long offHour) const {
   return (onHour >= 0 && onHour < 24 && offHour >= 0 && offHour < 24);
+}
+
+void ScheduleManager::checkAndExecute(unsigned long currentHour, PumpController &pumpController, MQTTManager &mqttManager) {
+  // Check if it is time to turn on to medium speed
+  if ((currentHour == _onHour) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
+  {
+    pumpController.setMedSpeed();
+    mqttManager.publishToSubtopic("pump_speed", "Medium");
+  }
+  
+  // Check if it is time to turn off to low speed
+  if ((currentHour == _offHour) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
+  {
+    pumpController.setLowSpeed();
+    mqttManager.publishToSubtopic("pump_speed", "Low");
+  }
 }

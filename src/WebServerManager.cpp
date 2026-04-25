@@ -3,14 +3,14 @@
 #include "MQTTManager.h"
 #include "ScheduleManager.h"
 #include "TemperatureSensor.h"
+#include "TimeManager.h"
+#include "InputManager.h"
 #include "html.h"
 
 WebServerManager::WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp)
     : _server(80), _pumpController(pump), _mqttManager(mqtt), _scheduleManager(schedule), _tempSensor(temp),
       _httpUsername(nullptr), _httpPassword(nullptr),
-      _currentRelaxStatus(nullptr), _rssi(nullptr),
-      _currentHour(nullptr), _currentMinute(nullptr), _currentSec(nullptr),
-      _currentDay(nullptr), _currentMd(nullptr), _currentYr(nullptr)
+      _timeManager(nullptr), _inputManager(nullptr), _rssi(nullptr)
 {
 }
 
@@ -48,17 +48,11 @@ void WebServerManager::begin(const char *username, const char *password)
   Serial.println("Web server started on port 80");
 }
 
-void WebServerManager::setReferences(int *relax, int *rssi, unsigned long *hour, unsigned long *minute, unsigned long *sec,
-                                      unsigned long *day, unsigned long *md, unsigned long *yr)
+void WebServerManager::setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, int *rssi)
 {
-  _currentRelaxStatus = relax;
+  _timeManager = &timeMgr;
+  _inputManager = &inputMgr;
   _rssi = rssi;
-  _currentHour = hour;
-  _currentMinute = minute;
-  _currentSec = sec;
-  _currentDay = day;
-  _currentMd = md;
-  _currentYr = yr;
 }
 
 // Handler for root page - show main interface
@@ -153,17 +147,17 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
 
   char buffer[200];
   sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%lu\",\"offTime\":\"%lu\",\"rssi\":\"%d\",\"hh\":\"%02lu\",\"mm\":\"%02lu\",\"ss\":\"%02lu\",\"dd\":\"%02lu\",\"md\":\"%02lu\",\"yy\":\"%02lu\",\"currentTemp\":\"%.2f\"}",
-          *_currentRelaxStatus,
+          _inputManager->getRelaxStatus(),
           _pumpController.getCurrentSpeed(),
           _scheduleManager.getOnHour(),
           _scheduleManager.getOffHour(),
           *_rssi,
-          *_currentHour,
-          *_currentMinute,
-          *_currentSec,
-          *_currentDay,
-          *_currentMd,
-          *_currentYr,
+          _timeManager->getHour(),
+          _timeManager->getMinute(),
+          _timeManager->getSecond(),
+          _timeManager->getDay(),
+          _timeManager->getMonth(),
+          _timeManager->getYear(),
           _tempSensor.getTemperature());
 
   request->send(200, "application/json", buffer);

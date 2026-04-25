@@ -15,6 +15,8 @@
 #include "ScheduleManager.h"
 #include "OTAManager.h"
 #include "WebServerManager.h"
+#include "TimeManager.h"
+#include "InputManager.h"
 
 #define WDT_TIMEOUT 90
 
@@ -47,6 +49,8 @@ TemperatureSensor temperatureSensor;
 ScheduleManager scheduleManager;
 OTAManager otaManager;
 WebServerManager webServerManager(pumpController, mqttManager, scheduleManager, temperatureSensor);
+TimeManager timeManager;
+InputManager inputManager;
 
 const char *ssid = SS_ID;
 const char *password = auth;
@@ -57,26 +61,8 @@ const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 
-unsigned long currentSec = 1;
-unsigned long currentDay = 1;
-unsigned long currentMd = 1;
-unsigned long currentYr = 1;
-unsigned long currentHour = 1;
-unsigned long currentMinute = 1;
-
-unsigned long previousTime = 0;
 signed int rssi = 0;
-int currentRelaxStatus = 0;
-
 unsigned long lastDallasRead = millis();
-
-// Variables will change:
-int LED_state = LOW;
-int button_state;
-int lastbutton_state = LOW;
-
-unsigned long lastDebounceTime = 0;
-unsigned long lastLEDToggle = 0;
 
 //******************************************************************************
 // Publish all sensor data to MQTT
@@ -99,7 +85,7 @@ void publishStatusToMQTT()
 
   // Publish pool relax status (1 = ok, 0 = error)
   char statusPayload[8];
-  snprintf(statusPayload, sizeof(statusPayload), "%d", currentRelaxStatus);
+  snprintf(statusPayload, sizeof(statusPayload), "%d", inputManager.getRelaxStatus());
   mqttManager.publishToSubtopic("status", statusPayload);
 
   // Publish IP address
@@ -108,37 +94,7 @@ void publishStatusToMQTT()
   snprintf(ipPayload, sizeof(ipPayload), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   mqttManager.publishToSubtopic("ip", ipPayload);
 }
-//******************************************************************************
-
-//******************************************************************************
-
-//******************************************************************************
-// Function to get the time from the network, this is called periodically
-void printLocalTime()
-{
-  struct tm timeinfo;
-
-  if (millis() - previousTime > 5000)  // Update every 5 seconds instead of 1 second
-  {
-    if (!getLocalTime(&timeinfo))
-    {
-      Serial.println("Failed to obtain time");
-      return;
-    }
-    previousTime = millis();
-    
-    currentHour = timeinfo.tm_hour;
-    currentMinute = timeinfo.tm_min;
-    currentSec = timeinfo.tm_sec;
-    currentDay = timeinfo.tm_mday;
-    currentMd = timeinfo.tm_mon;
-    currentYr = timeinfo.tm_year + 1900;
-
-    // Disabled verbose time logging to reduce serial output and improve OTA responsiveness
-    // Serial.printf("Time: %02d:%02d:%02d\n", currentHour, currentMinute, currentSec);
-  }
-}
-//******************************************************************************
+//*****************************************************************************/
 
 //******************************************************************************
 // Arduino main setup function
@@ -168,24 +124,22 @@ void setup()
   // Wait for WiFi connection
   delay(3000);
 
-  // Init and get the time
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  printLocalTime();
+  // Initialize time manager with NTP
+  timeManager.begin(ntpServer, gmtOffset_sec, daylightOffset_sec);
+  timeManager.update();
+
+  // Initialize input manager (button and LED)
+  inputManager.begin(GPIO_BUTTON, LED_BUILTIN, DEBOUNCE_DELAY, LED_BLINK_INTERVAL);
 
   // Setup web server
   webServerManager.begin(http_username, http_password);
-  webServerManager.setReferences(&currentRelaxStatus, &rssi, &currentHour, &currentMinute, &currentSec,
-                                  &currentDay, &currentMd, &currentYr);
+  webServerManager.setManagerReferences(timeManager, inputManager, &rssi);
 
   // Initialize OTA Manager
   otaManager.begin();
 
   // Initialize pump controller
   pumpController.begin(GPIO_HIGH_SPEED, GPIO_LOW_SPEED, GPIO_MED_SPEED, GPIO_STOP);
-
-  // Setup digital pins
-  pinMode(GPIO_BUTTON, INPUT_PULLUP);
-  pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.println("Setup complete!");
 }
@@ -206,50 +160,20 @@ void loop()
     mqttManager.handle();
   }
 
-  // Get the time
-  printLocalTime();
+  // Update time from NTP
+  timeManager.update();
 
-  // Read in status from pool relax
-  int data = digitalRead(GPIO_BUTTON);
-  if (data != lastbutton_state)
-  {
-    // reset the debouncing timer
-    lastDebounceTime = millis();
-  }
+  // Update button and LED status
+  inputManager.update();
 
-  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY)
-  {
-    // Get the wifi rssi, this is used to kick the HW watchdog
-    rssi = wifiManager.getRSSI();
+  // Get the wifi rssi, this is used to kick the HW watchdog
+  rssi = wifiManager.getRSSI();
 
-    // Check if rssi reading is ok, if not the do not kick the HW watchdog
-    if (rssi != 0)
-      esp_task_wdt_reset();
-
-    if (data != button_state)
-    {
-      button_state = data;
-      currentRelaxStatus = data;
-
-      if (button_state == HIGH)
-      {
-        LED_state = !LED_state;
-      }
-    }
-
-    lastDebounceTime = millis();
-  }
-
-  // Visible LED blink every 500ms (independent of button)
-  if ((millis() - lastLEDToggle) >= LED_BLINK_INTERVAL)
-  {
-    lastLEDToggle = millis();
-    LED_state = !LED_state;
-    digitalWrite(LED_BUILTIN, LED_state);
-  }
+  // Check if rssi reading is ok, if not then do not kick the HW watchdog
+  if (rssi != 0)
+    esp_task_wdt_reset();
 
   if((millis() - lastDallasRead) > TEMP_READ_INTERVAL){
-     digitalWrite(LED_BUILTIN, HIGH);
      lastDallasRead = millis();
      
      // Read temperature from sensor
@@ -257,27 +181,12 @@ void loop()
 
      // Publish all status data to MQTT
      publishStatusToMQTT();
-
-     digitalWrite(LED_BUILTIN, LOW);
    }
 
-  lastbutton_state = data;
-
-  // Check if it is time to turn on or off the pump speed (every 500ms)
+  // Check and execute pump schedule (every 500ms)
   if ((millis() - lastLoopDelay) >= PUMP_CHECK_INTERVAL)
   {
     lastLoopDelay = millis();
-
-    // Check if it is time to turn on or off the pump speed
-    if ((currentHour == scheduleManager.getOnHour()) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
-    {
-      pumpController.setMedSpeed();
-      mqttManager.publishToSubtopic("pump_speed", "Medium");
-    }
-    if ((currentHour == scheduleManager.getOffHour()) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
-    {
-      pumpController.setLowSpeed();
-      mqttManager.publishToSubtopic("pump_speed", "Low");
-    }
+    scheduleManager.checkAndExecute(timeManager.getHour(), pumpController, mqttManager);
   }
 }
