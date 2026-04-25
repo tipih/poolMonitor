@@ -184,15 +184,6 @@ void MQTTManager::publishHADiscovery()
            _baseTopic, haId, deviceJson);
   _mqttClient.publish(topic, payload, true);
 
-  // Current Pump Speed (continuous)
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_current_speed/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Current Pump Speed\",\"state_topic\":\"%s/current_speed\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_current_speed\","
-           "\"device\":%s}",
-           _baseTopic, haId, deviceJson);
-  _mqttClient.publish(topic, payload, true);
-
   // Pool Monitor Status (1=ok, 0=error)
   snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_status/config", haId);
   snprintf(payload, sizeof(payload),

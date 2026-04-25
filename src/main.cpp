@@ -484,7 +484,7 @@ void loop()
      // Publish current pump speed
      char speedPayload[16];
      snprintf(speedPayload, sizeof(speedPayload), "%s", pumpController.getSpeedString());
-     mqttManager.publishToSubtopic("current_speed", speedPayload);
+     mqttManager.publishToSubtopic("pump_speed", speedPayload);
 
      // Publish pool relax status (1 = ok, 0 = error)
      char statusPayload[8];
