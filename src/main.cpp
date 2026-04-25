@@ -11,10 +11,11 @@
 #include "Preferences.h"
 #include <esp_task_wdt.h>
 #include "cred.h"
-#include <DallasTemperature.h>
 #include "WiFiManager.h"
 #include "MQTTManager.h"
 #include "PumpController.h"
+#include "TemperatureSensor.h"
+#include "ScheduleManager.h"
 
 #define WDT_TIMEOUT 90
 
@@ -43,6 +44,8 @@
 WiFiManager wifiManager;
 MQTTManager mqttManager;
 PumpController pumpController;
+TemperatureSensor temperatureSensor;
+ScheduleManager scheduleManager;
 
 const char *ssid = SS_ID;
 const char *password = auth;
@@ -61,20 +64,10 @@ unsigned long currentHour = 1;
 unsigned long currentMinute = 1;
 
 unsigned long previousTime = 0;
-unsigned long onHour = 6;
-unsigned long offHour = 17;
 signed int rssi = 0;
 int currentRelaxStatus = 0;
 
-float currentTemp = -999;
-
-// Setup a oneWire instance to communicate with any OneWire devices
-OneWire oneWire(GPIO_ONE_WIRE);
-// Pass our oneWire reference to Dallas Temperature.
-DallasTemperature sensors(&oneWire);
 unsigned long lastDallasRead = millis();
-
-Preferences preferences;
 
 // Variables will change:
 int LED_state = LOW;
@@ -87,200 +80,160 @@ unsigned long lastLEDToggle = 0;
 AsyncWebServer server(80);
 
 //******************************************************************************
-// Get data from NVM memory and update the VARS, if not data set default values
-void getPreference()
+// Publish all sensor data to MQTT
+void publishStatusToMQTT()
 {
-  preferences.begin("poolPump", false);
-  onHour = preferences.getLong("onHour", 6);
-  offHour = preferences.getLong("offHour", 23);
-  preferences.end();
+  // Publish temperature
+  char tempPayload[32];
+  snprintf(tempPayload, sizeof(tempPayload), "%.2f", temperatureSensor.getTemperature());
+  mqttManager.publishToSubtopic("temperature", tempPayload);
 
-  if ((onHour > 0) && (offHour < 24) && (onHour < 24) && (offHour > 0))
-  {
-    Serial.println("Got some preferences");
-    Serial.println(onHour);
-    Serial.print(offHour);
-  }
-  else
-  {
-    onHour = 6;
-    offHour = 18;
-  }
+  // Publish RSSI (WiFi signal strength)
+  char rssiPayload[16];
+  snprintf(rssiPayload, sizeof(rssiPayload), "%d", rssi);
+  mqttManager.publishToSubtopic("rssi", rssiPayload);
+
+  // Publish current pump speed
+  char speedPayload[16];
+  snprintf(speedPayload, sizeof(speedPayload), "%s", pumpController.getSpeedString());
+  mqttManager.publishToSubtopic("pump_speed", speedPayload);
+
+  // Publish pool relax status (1 = ok, 0 = error)
+  char statusPayload[8];
+  snprintf(statusPayload, sizeof(statusPayload), "%d", currentRelaxStatus);
+  mqttManager.publishToSubtopic("status", statusPayload);
+
+  // Publish IP address
+  IPAddress ip = wifiManager.getLocalIP();
+  char ipPayload[16];
+  snprintf(ipPayload, sizeof(ipPayload), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  mqttManager.publishToSubtopic("ip", ipPayload);
 }
 //******************************************************************************
 
 //******************************************************************************
-// Store data to NVM
-void setPreference()
+// Web server handlers
+//******************************************************************************
+
+// Handler for root page - show main interface
+void handleRoot(AsyncWebServerRequest *request)
 {
-  preferences.begin("poolPump", false);
-  preferences.putLong("onHour", onHour);
-  preferences.putLong("offHour", offHour);
-  preferences.end();
+  if (!request->authenticate(http_username, http_password))
+    return request->requestAuthentication();
+  request->send_P(200, "text/html", index_html);
 }
-//******************************************************************************
 
-
-//******************************************************************************
-// Get Dallas temp data
-float getTemperatur()
+// Handler for logout
+void handleLogout(AsyncWebServerRequest *request)
 {
- sensors.requestTemperatures(); // Send the command to get temperatures
- float tempC = sensors.getTempCByIndex(0);
- if (tempC != DEVICE_DISCONNECTED_C)
+  request->send(401);
+}
+
+// Handler for logged out page
+void handleLoggedOut(AsyncWebServerRequest *request)
+{
+  request->send_P(200, "text/html", logout_html);
+}
+
+// Handler for pump control updates
+void handleUpdate(AsyncWebServerRequest *request)
+{
+  Serial.println("Got an update");
+  if (!request->authenticate(http_username, http_password))
+    return request->requestAuthentication();
+
+  if (request->params() == 1)
   {
-    Serial.print("Temperature for the device 1 (index 0) is: ");
-    Serial.println(tempC);
-    return tempC;
+    AsyncWebParameter *p = request->getParam(0);
+    String value = p->value();
+
+    Serial.print("Button: ");
+    Serial.println(value);
+
+    if (value == "LowOff")
+    {
+      pumpController.setLowSpeed();
+      mqttManager.publishToSubtopic("pump_speed", "Low");
+    }
+    else if (value == "HighOff")
+    {
+      pumpController.setHighSpeed();
+      mqttManager.publishToSubtopic("pump_speed", "High");
+    }
+    else if (value == "MedOff")
+    {
+      pumpController.setMedSpeed();
+      mqttManager.publishToSubtopic("pump_speed", "Medium");
+    }
+    else if (value == "StopOff")
+    {
+      pumpController.setStop();
+      mqttManager.publishToSubtopic("pump_speed", "Stopped");
+    }
   }
-  else
-  {
-    Serial.println("Error: Could not read temperature data");
-    return -999;
-  }
+
+  request->send(200, "text/plain", "OK");
 }
-//******************************************************************************
 
-
-//******************************************************************************
-// Function to set on/off time for the pump, and store the new values to NVM
-void setOnOffTime(unsigned long ontime, unsigned long offtime)
+// Handler for time schedule adjustments
+void handleTimeAdjust(AsyncWebServerRequest *request)
 {
+  Serial.println("Got a time update");
+  if (!request->authenticate(http_username, http_password))
+    return request->requestAuthentication();
 
-  onHour = ontime;   // Store global ontime
-  offHour = offtime; // Store global offtime
-  setPreference();   // Save on off for next time
+  if (request->params() > 1)
+  {
+    unsigned long onTime = request->getParam(0)->value().toInt();
+    unsigned long offTime = request->getParam(1)->value().toInt();
+
+    Serial.print("New schedule: ON=");
+    Serial.print(onTime);
+    Serial.print(", OFF=");
+    Serial.println(offTime);
+
+    scheduleManager.setSchedule(onTime, offTime);
+  }
+
+  request->send(200, "text/plain", "OK");
 }
-//******************************************************************************
 
+// Handler for state polling
+void handleState(AsyncWebServerRequest *request)
+{
+  Serial.println("Got a state request");
+  if (!request->authenticate(http_username, http_password))
+    return request->requestAuthentication();
 
+  char buffer[200];
+  sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%lu\",\"offTime\":\"%lu\",\"rssi\":\"%d\",\"hh\":\"%02lu\",\"mm\":\"%02lu\",\"ss\":\"%02lu\",\"dd\":\"%02lu\",\"md\":\"%02lu\",\"yy\":\"%02lu\",\"currentTemp\":\"%.2f\"}",
+          currentRelaxStatus,
+          pumpController.getCurrentSpeed(),
+          scheduleManager.getOnHour(),
+          scheduleManager.getOffHour(),
+          rssi,
+          currentHour,
+          currentMinute,
+          currentSec,
+          currentDay,
+          currentMd,
+          currentYr,
+          temperatureSensor.getTemperature());
 
+  request->send(200, "application/json", buffer);
+}
 
 //******************************************************************************
 // Setup the async server handler functions, and then start the server
 void setupServer()
 {
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/logout", HTTP_GET, handleLogout);
+  server.on("/logged-out", HTTP_GET, handleLoggedOut);
+  server.on("/update", HTTP_GET, handleUpdate);
+  server.on("/timeAdjust", HTTP_GET, handleTimeAdjust);
+  server.on("/state", HTTP_GET, handleState);
 
-  // Main handler function check auth, if ok the send the index page, else show popup
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            {
-          if(!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
-    request->send_P(200, "text/html", index_html); });
-  // Handler to logoff request
-  server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(401); });
-  // Handler to for logged out page, send it
-  server.on("/logged-out", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send_P(200, "text/html", logout_html); });
-  // Handler for the update request, check if auth is ok
-  // if ok get the input params, and check the values
-  // change the pumpspeed according to the button pressed
-  // and send ok back to client
-  server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
-            {
-              Serial.println("Got an update");
-              if (!request->authenticate(http_username, http_password))
-                return request->requestAuthentication();
-              String input_message = "";
-              String inputParameter;
-              int params = request->params();
-              // GET input1 value on <ESP_IP>/update?state=<input_message>
-              Serial.println(params);
-              if (params == 1)
-              {
-                AsyncWebParameter *p = request->getParam(0);
-
-                Serial.println(p->name());
-                Serial.println(p->value());
-                if (p->value() == "LowOff")
-                {
-                  pumpController.setLowSpeed();
-                  mqttManager.publishToSubtopic("pump_speed", "Low");
-                }
-                else if ((p->value() == "HighOff"))
-                {
-                  pumpController.setHighSpeed();
-                  mqttManager.publishToSubtopic("pump_speed", "High");
-                }
-                else if ((p->value() == "MedOff"))
-                {
-                  pumpController.setMedSpeed();
-                  mqttManager.publishToSubtopic("pump_speed", "Medium");
-                }
-                else if ((p->value() == "StopOff"))
-                {
-                  pumpController.setStop();
-                  mqttManager.publishToSubtopic("pump_speed", "Stopped");
-                }
-              
-              }
-              else
-              {
-                input_message = "No Data";
-              }
-
-              Serial.println(input_message);
-              request->send(200, "text/plain", "OK"); });
-
-  // Handler for change the on / off time from the client
-  // Check if client is auth, if ok the get params
-  server.on("/timeAdjust", HTTP_GET, [](AsyncWebServerRequest *request)
-            {
-    Serial.println("Got an Time update");
-        if(!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
-    String input_message="";
-    String inputParameter;
-    int params = request->params();
-    // GET input1 value on <ESP_IP>/update?state=<input_message>
-    Serial.println(params);
-  if (params>1)
-  {
-  
-   Serial.print(request->getParam(0)->name());
-   Serial.println(request->getParam(0)->value());
-   Serial.print(request->getParam(1)->name());
-   Serial.println(request->getParam(1)->value());
-  //Convert the params to integer
-  unsigned long onTime = request->getParam(0)->value().toInt();
-  unsigned long offTime = request->getParam(1)->value().toInt();
-   //Check the values are ok and within the limit
-   //if ok then call function to store new values
-   if ((onTime >0) && (onTime<24) && (offTime>0) && (offTime<24) ){
-    Serial.println("Value are ok");
-    Serial.println(onTime);
-    Serial.println(offTime);
-    setOnOffTime(onTime,offTime);
-   }
-  }
-  else
-  {
-  input_message="No Data";
-  }
-
-  //Send ok to client  
-  Serial.println(input_message);
-  request->send(200, "text/plain", "OK"); });
-
-  // Handler to state update
-  // Check if client is auth, if ok then send values to client in a json format
-  server.on("/state", HTTP_GET, [](AsyncWebServerRequest *request)
-            {
-      Serial.println("Got an update request");
-      if (!request->authenticate(http_username, http_password))
-       return request->requestAuthentication();
-      char buffer[200];
-      //Format a json string, with all the data to be updated in the client
-      sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%d\",\"offTime\":\"%d\",\"rssi\":\"%d\",\"hh\":\"%02d\",\"mm\":\"%02d\",\"ss\":\"%02d\",\"dd\":\"%02d\",\"md\":\"%02d\",\"yy\":\"%02d\",\"currentTemp\":\"%.2f\"}",currentRelaxStatus, pumpController.getCurrentSpeed(), onHour, offHour, rssi,currentHour,currentMinute,currentSec,currentDay,currentMd,currentYr,currentTemp);
-      
-      Serial.print(buffer);
-      //Send data to the client
-      request->send(200, "application/json", buffer); 
-       }
-      );
-
-  // Start the server
   server.begin();
 }
 //******************************************************************************
@@ -373,10 +326,14 @@ void setup()
   Serial.begin(115200);
   delay(500);
 
-  // Get preferences from NVM
-  getPreference();
+  // Initialize schedule manager and load from NVM
+  scheduleManager.begin();
+
+  // Initialize temperature sensor
+  temperatureSensor.begin(GPIO_ONE_WIRE, TEMP_CALIBRATION_OFFSET);
 
   // Initialize WiFi Manager
+  Preferences preferences;
   wifiManager.begin(ssid, password, &preferences);
 
   // Initialize MQTT Manager
@@ -466,36 +423,14 @@ void loop()
   }
 
   if((millis() - lastDallasRead) > TEMP_READ_INTERVAL){
-     digitalWrite(LED_BUILTIN,HIGH);
-         lastDallasRead = millis();
-     currentTemp = getTemperatur(); 
-     currentTemp += TEMP_CALIBRATION_OFFSET;
+     digitalWrite(LED_BUILTIN, HIGH);
+     lastDallasRead = millis();
+     
+     // Read temperature from sensor
+     temperatureSensor.readTemperature();
 
-     // Publish temperature to MQTT
-     char tempPayload[32];
-     snprintf(tempPayload, sizeof(tempPayload), "%.2f", currentTemp);
-     mqttManager.publishToSubtopic("temperature", tempPayload);
-
-     // Publish RSSI (WiFi signal strength)
-     char rssiPayload[16];
-     snprintf(rssiPayload, sizeof(rssiPayload), "%d", rssi);
-     mqttManager.publishToSubtopic("rssi", rssiPayload);
-
-     // Publish current pump speed
-     char speedPayload[16];
-     snprintf(speedPayload, sizeof(speedPayload), "%s", pumpController.getSpeedString());
-     mqttManager.publishToSubtopic("pump_speed", speedPayload);
-
-     // Publish pool relax status (1 = ok, 0 = error)
-     char statusPayload[8];
-     snprintf(statusPayload, sizeof(statusPayload), "%d", currentRelaxStatus);
-     mqttManager.publishToSubtopic("status", statusPayload);
-
-     // Publish IP address
-     IPAddress ip = wifiManager.getLocalIP();
-     char ipPayload[16];
-     snprintf(ipPayload, sizeof(ipPayload), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-     mqttManager.publishToSubtopic("ip", ipPayload);
+     // Publish all status data to MQTT
+     publishStatusToMQTT();
 
      digitalWrite(LED_BUILTIN, LOW);
    }
@@ -508,12 +443,12 @@ void loop()
     lastLoopDelay = millis();
 
     // Check if it is time to turn on or off the pump speed
-    if ((currentHour == onHour) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
+    if ((currentHour == scheduleManager.getOnHour()) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
     {
       pumpController.setMedSpeed();
       mqttManager.publishToSubtopic("pump_speed", "Medium");
     }
-    if ((currentHour == offHour) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
+    if ((currentHour == scheduleManager.getOffHour()) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
     {
       pumpController.setLowSpeed();
       mqttManager.publishToSubtopic("pump_speed", "Low");
