@@ -2,123 +2,266 @@
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
   <head>
-    <title>ESP Pump control</title>
+    <title>Pool Monitor</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,">
     <style>
-      body { font-family: Arial; text-align: center; margin:0px auto; padding-top: 30px;background-color: #383e42;}
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .header {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      }
+      .header h1 {
+        font-size: 28px;
+        color: #667eea;
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+      .status-bar {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+        font-size: 14px;
+        color: #666;
+      }
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .status-dot {
+        width: 12px;
+        height: 12px;
+        background-color: #f00;
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .temp-display {
+        font-size: 18px;
+        font-weight: 600;
+        color: #667eea;
+      }
+      .card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+      }
+      .card h2 {
+        font-size: 20px;
+        margin-bottom: 16px;
+        color: #333;
+        font-weight: 600;
+      }
+      .pump-controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
       .button {
-        padding: 10px 20px;
-        width: 250px;
-        margin: 5px;
-        font-size: 24px;
+        padding: 16px;
+        font-size: 16px;
+        font-weight: 500;
         text-align: center;
-        outline: none;
         color: #fff;
-        background-color: #2f4468;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border: none;
-        border-radius: 5px;
-        box-shadow: 0 6px #999;
+        border-radius: 12px;
         cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         -webkit-touch-callout: none;
         -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
         user-select: none;
-        -webkit-tap-highlight-color: rgba(0,0,0,0);
+        -webkit-tap-highlight-color: transparent;
       }  
-      .button:hover {background-color: #1f2e45}
-      .button:active {
-        background-color: #1f2e45;
-        box-shadow: 0 4px #666;
-        transform: translateY(2px);
+      .button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
       }
-      
-      .card {
-  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.9);
-  transition: 0.3s;
-  width: 90%;
-  padding: 1px 1px 10px 10px;
-  
-  border-radius: 5px;
-  margin: 0 auto;
- 
-}
-
-.card:hover {
-  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.5);
-}
-  
-  .dot {
-    position: absolute;
-    top: 5px;
-    left: 5px;
-  height: 10px;
-  width: 10px;
-  background-color: #f00;
-  border-radius: 50%;
-  display: inline-block;
-}
+      .button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+      }
+      .button.secondary {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+      }
+      .button.secondary:hover {
+        box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+      }
+      .speed-display {
+        text-align: center;
+        padding: 16px;
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        border-radius: 12px;
+        color: white;
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+      .status-badge {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 16px;
+      }
+      .status-ok { background: #10b981; color: white; }
+      .status-error { background: #ef4444; color: white; }
+      .time-settings {
+        display: grid;
+        gap: 12px;
+      }
+      .time-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        background: #f9fafb;
+        border-radius: 8px;
+      }
+      .time-row label {
+        font-weight: 500;
+        color: #666;
+      }
+      .time-row span {
+        font-weight: 600;
+        color: #667eea;
+        font-size: 18px;
+      }
+      .time-input-group {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .input-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .input-wrapper label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+      }
+      input[type="number"] {
+        padding: 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 16px;
+        transition: border-color 0.3s;
+      }
+      input[type="number"]:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+      .button-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+      @media (max-width: 600px) {
+        .pump-controls {
+          grid-template-columns: 1fr 1fr;
+        }
+        .header h1 { font-size: 24px; }
+        .status-bar { font-size: 12px; }
+      }
      </style>
   </head>
   <body>
-  
-  <h1  style="color:#999999;"> "ESP Pump control </h1>
-  <h5  style="color:#ffffff;" id="rssi">RSSI -65 Time 08:00:00 14.06.2022  </h5>
-  <h5 class="dot" id="mydot"></h5>
-  <h5  id="status_temp">-999 </h5>
-    
-    <button class="button" onmousedown="toggleCheckbox('LowOn');" ontouchstart="toggleCheckbox('LowOn');" onmouseup="toggleCheckbox('LowOff');" ontouchend="toggleCheckbox('LowOff');">Pump low speed</button>
-    
-    <button class="button" onmousedown="toggleCheckbox('MedOn');" ontouchstart="toggleCheckbox('MedOn');" onmouseup="toggleCheckbox('MedOff');" ontouchend="toggleCheckbox('MedOff');">Pump med speed</button>
+    <div class="container">
+      <div class="header">
+        <h1>🏊 Pool Monitor</h1>
+        <div class="status-bar">
+          <div class="status-item">
+            <span class="status-dot" id="mydot"></span>
+            <span>Connected</span>
+          </div>
+          <div class="status-item" id="rssi">📶 RSSI -65 | ⏰ 08:00:00 14.06.2022</div>
+          <div class="status-item">
+            <span class="temp-display" id="status_temp">🌡️ -999°C</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>⚙️ Pump Controls</h2>
+        <div class="speed-display" id="poolPumpSpeed">Pump Speed LOW</div>
+        <div class="pump-controls">
+          <button class="button" onmousedown="toggleCheckbox('LowOn');" ontouchstart="toggleCheckbox('LowOn');" onmouseup="toggleCheckbox('LowOff');" ontouchend="toggleCheckbox('LowOff');">🐢 Low Speed</button>
+          <button class="button" onmousedown="toggleCheckbox('MedOn');" ontouchstart="toggleCheckbox('MedOn');" onmouseup="toggleCheckbox('MedOff');" ontouchend="toggleCheckbox('MedOff');">🚶 Med Speed</button>
+          <button class="button" onmousedown="toggleCheckbox('HighOn');" ontouchstart="toggleCheckbox('HighOn');" onmouseup="toggleCheckbox('HighOff');" ontouchend="toggleCheckbox('HighOff');">🚀 High Speed</button>
+          <button class="button secondary" onmousedown="toggleCheckbox('StopOn');" ontouchstart="toggleCheckbox('StopOn');" onmouseup="toggleCheckbox('StopOff');" ontouchend="toggleCheckbox('StopOff');">⏹️ Stop</button>
+        </div>
+      </div>
 
-    <button class="button" onmousedown="toggleCheckbox('HighOn');" ontouchstart="toggleCheckbox('HighOn');" onmouseup="toggleCheckbox('HighOff');" ontouchend="toggleCheckbox('HighOff');">Pump high speed</button>
-  
-    <button class="button" onmousedown="toggleCheckbox('StopOn');" ontouchstart="toggleCheckbox('StopOn');" onmouseup="toggleCheckbox('StopOff');" ontouchend="toggleCheckbox('StopOff');">Pump Stop</button>
+      <div class="card">
+        <h2>💧 Pool Status</h2>
+        <div style="text-align: center;">
+          <span class="status-badge status-ok" id="poolRelaxState">OK</span>
+        </div>
+      </div>
 
-  <h2 style="color:#999999;" id="poolPumpSpeed">Pump Speed LOW</h2>
-
-<div class="card">
- 
-  <div class="container">
-    <h4><b style="color:#999999;">Pool Relax status</b></h4> 
-    <p  style="color:#dddddd;" id="poolRelaxState">OK</p>
-  </div>
- </div>
-
-  
-<div class="card">  
-   <div class="container">
-  
-  <h4><b style="color:#999999;">Time Settings</b></h4> 
-    
-  <div style="display: flex; justify-content: space-between;">
-  <p style="flex-basis: 49.5%; background-color: papayawhip;">Pump Time On.</p>
-  <p style="flex-basis: 49.5%; background-color: palegoldenrod;" id="timeOn">09</p>
-</div>
-   <div style="display: flex; justify-content: space-between;">
-  <p style="flex-basis: 49.5%; background-color: papayawhip;">Pump Time Off.</p>
-  <p style="flex-basis: 49.5%; background-color: palegoldenrod;" id="timeOff">18</p>
-</div> 
-    
- 
-    <h4 id="pumpontime">
-    Pump on time
-        <input type="number" id="ontime" name="tentacles"
-       min="00" max="23" onchange="changeOnTime(value)">
-    </h4>   
-    <h4 id="pumpofftime">
-    Pump off time
-    <input type="number" id="offtime" name="tentacles"
-       min="00" max="23" onchange="changeOffTime(value)">
-       </h4>
-
-    <button class="button" onmouseup="setTime();" ontouchend="toggleCheckbox();">SetTime</button> 
-    <button class="button" onclick="logoutButton()">Logout</button> 
-  </div>
- </div>
+      <div class="card">
+        <h2>⏰ Schedule Settings</h2>
+        <div class="time-settings">
+          <div class="time-row">
+            <label>Pump Start Time</label>
+            <span id="timeOn">09:00</span>
+          </div>
+          <div class="time-row">
+            <label>Pump Stop Time</label>
+            <span id="timeOff">18:00</span>
+          </div>
+        </div>
+        
+        <div class="time-input-group">
+          <div class="input-wrapper">
+            <label for="ontime">Set Start Hour (0-23)</label>
+            <input type="number" id="ontime" min="0" max="23" placeholder="6" onchange="changeOnTime(value)">
+          </div>
+          <div class="input-wrapper">
+            <label for="offtime">Set Stop Hour (0-23)</label>
+            <input type="number" id="offtime" min="0" max="23" placeholder="18" onchange="changeOffTime(value)">
+          </div>
+        </div>
+        
+        <div class="button-group">
+          <button class="button" onmouseup="setTime();" ontouchend="setTime();">💾 Save Schedule</button> 
+          <button class="button secondary" onclick="logoutButton()">🚪 Logout</button>
+        </div>
+      </div>
+    </div>
 
 <script>
  var server_running = true;
@@ -226,10 +369,12 @@ const char index_html[] PROGMEM = R"rawliteral(
 if (RelaxStatus==1) 
     {
       document.getElementById("poolRelaxState").innerHTML = "OK";
+      document.getElementById("poolRelaxState").className = "status-badge status-ok";
     }
     else if(RelaxStatus==0) 
     {
-     document.getElementById("poolRelaxState").innerHTML = "FEJL";   
+      document.getElementById("poolRelaxState").innerHTML = "ERROR";
+      document.getElementById("poolRelaxState").className = "status-badge status-error";
     }
 
 if (pumpSpeed==0) 
@@ -253,11 +398,11 @@ if (pumpSpeed==0)
        document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed Stop"; 
     }
 
-    document.getElementById("timeOn").innerHTML =timeon ;
-    document.getElementById("timeOff").innerHTML =timeoff ; 
+    document.getElementById("timeOn").innerHTML = timeon + ":00";
+    document.getElementById("timeOff").innerHTML = timeoff + ":00"; 
  
-    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Time "+hh+":"+mm+":"+ss+" "+dd+"."+(parseInt(md)+1)+"."+yy;
-    document.getElementById("status_temp").innerHTML ="Temperature: "+temperatur+"°C";
+    document.getElementById("rssi").innerHTML = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + (parseInt(md)+1) + "." + yy;
+    document.getElementById("status_temp").innerHTML = "🌡️ " + temperatur + "°C";
 
   }
  };
@@ -309,10 +454,43 @@ const char logout_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 400px;
+    }
+    h1 { color: #667eea; margin-bottom: 16px; font-size: 24px; }
+    p { color: #666; line-height: 1.6; margin-bottom: 12px; }
+    a { 
+      color: #667eea; 
+      text-decoration: none; 
+      font-weight: 600;
+      border-bottom: 2px solid #667eea;
+    }
+    a:hover { color: #764ba2; border-color: #764ba2; }
+  </style>
 </head>
 <body>
-  <p>Logged out or <a href="/">return to homepage</a>.</p>
-  <p><strong>Note:</strong> close all web browser tabs to complete the logout process.</p>
+  <div class="card">
+    <h1>🚪 Logged Out</h1>
+    <p>You have been successfully logged out.</p>
+    <p><a href="/">← Return to homepage</a></p>
+    <p style="margin-top: 20px; font-size: 14px;"><strong>Note:</strong> Close all browser tabs to complete the logout process.</p>
+  </div>
 </body>
 </html>
 )rawliteral";
