@@ -3,6 +3,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
   <head>
     <title>ESP Pump control</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,">
     <style>
@@ -214,6 +215,13 @@ const char index_html[] PROGMEM = R"rawliteral(
      timeon=obj.onTime;
      timeoff=obj.offTime;
      rssi=obj.rssi;
+     hh=obj.hh;
+     mm=obj.mm;
+     ss=obj.ss;
+     dd=obj.dd;
+     md=obj.md;
+     yy=obj.yy;
+     temperatur=obj.currentTemp;
 
 if (RelaxStatus==1) 
     {
@@ -248,9 +256,8 @@ if (pumpSpeed==0)
     document.getElementById("timeOn").innerHTML =timeon ;
     document.getElementById("timeOff").innerHTML =timeoff ; 
  
-    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Tid:"+hh+":"+mm+" Dato "+dd+"."+md+"."+yy;
-    document.getElementById("status").innerHTML =pumpSpeed;
-    document.getElementById("status_temp").innerHTML ="Temperatur: "+temperatur;
+    document.getElementById("rssi").innerHTML ="RSSI "+rssi+" Time "+hh+":"+mm+":"+ss+" "+dd+"."+(parseInt(md)+1)+"."+yy;
+    document.getElementById("status_temp").innerHTML ="Temperature: "+temperatur+"°C";
 
   }
  };

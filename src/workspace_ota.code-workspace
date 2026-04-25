@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "TestOTA_for_PlatformIO",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.tcc": "cpp"
+		}
+	}
+}
