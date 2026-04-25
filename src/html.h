@@ -411,38 +411,13 @@ if (pumpSpeed==0)
 }, 2000 ) ;
 
 setInterval(function ( ) {
-
-var colorStatus = document.getElementById("mydot").style.backgroundColor;
-
-if ((colorStatus == "red") && (server_running==true)) {
-  document.getElementById("mydot").style.backgroundColor  = "green";
-  server_running=false;
+  if (server_running == true) {
+    document.getElementById("mydot").style.backgroundColor = "green";
+    server_running = false;
+  } else {
+    document.getElementById("mydot").style.backgroundColor = "red";
   }
-  else
-  {
-  document.getElementById("mydot").style.backgroundColor  = "red";
-  }
-
-
-
-},1000);
-
-setInterval(function ( ) {
-
-var colorStatus = document.getElementById("mydot").style.backgroundColor;
-
-if ((colorStatus == "red") && (server_running==true)) {
-  document.getElementById("mydot").style.backgroundColor  = "green";
-  server_running=false;
-  }
-  else
-  {
-  document.getElementById("mydot").style.backgroundColor  = "red";
-  }
-
-
-
-},1000);
+}, 1000);
 
   </script>
   </body>
