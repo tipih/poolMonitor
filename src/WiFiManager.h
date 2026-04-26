@@ -22,6 +22,9 @@ public:
   // Get local IP address
   IPAddress getLocalIP();
 
+  // Must be called from loop() to safely act on reconnect/restart flags
+  void handle();
+
 private:
   const char *_ssid;
   const char *_password;
@@ -30,7 +33,11 @@ private:
   static int _reconnectAttempts;
   static const int _maxReconnectAttempts = 5;
 
-  // Event handlers
+  // Flags set by event handlers (ISR-safe bools), acted on in handle()
+  static volatile bool _shouldReconnect;
+  static volatile bool _shouldRestart;
+
+  // Event handlers — must only set flags, no WiFi API calls or delays
   static void onStationConnected(WiFiEvent_t event, WiFiEventInfo_t info);
   static void onGotIP(WiFiEvent_t event, WiFiEventInfo_t info);
   static void onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info);

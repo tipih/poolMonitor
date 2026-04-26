@@ -5,6 +5,8 @@
 Preferences *WiFiManager::_staticPrefs = nullptr;
 unsigned long *WiFiManager::_staticResetCounter = nullptr;
 int WiFiManager::_reconnectAttempts = 0;
+volatile bool WiFiManager::_shouldReconnect = false;
+volatile bool WiFiManager::_shouldRestart = false;
 
 WiFiManager::WiFiManager()
 {
@@ -86,10 +88,13 @@ void WiFiManager::onGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
 
 void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
+  // WARNING: This runs inside the ESP-IDF WiFi task.
+  // Do NOT call WiFi API, delay(), NVS/Preferences, or ESP.restart() here —
+  // they can deadlock or corrupt state. Only set flags; handle() acts on them.
   Serial.println("Disconnected from WiFi access point");
   Serial.print("WiFi lost connection. Reason: ");
   Serial.println(info.wifi_sta_disconnected.reason);
-  
+
   _reconnectAttempts++;
   Serial.print("Reconnect attempt: ");
   Serial.print(_reconnectAttempts);
@@ -97,19 +102,28 @@ void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
   Serial.println(_maxReconnectAttempts);
 
   if (_reconnectAttempts < _maxReconnectAttempts)
+    _shouldReconnect = true;
+  else
+    _shouldRestart = true;
+}
+
+void WiFiManager::handle()
+{
+  if (_shouldReconnect)
   {
-    // Try to reconnect
-    Serial.println("Trying to reconnect...");
+    _shouldReconnect = false;
+    Serial.println("[WiFiManager] Reconnecting from main task...");
     WiFi.disconnect();
     delay(1000);
-    WiFi.begin();
+    WiFi.begin(_ssid, _password);
   }
-  else
+
+  if (_shouldRestart)
   {
-    // Max retries exceeded, restart ESP
-    Serial.println("Max reconnect attempts exceeded. Restarting...");
-    
-    // Increment reset counter and save to preferences
+    _shouldRestart = false;
+    Serial.println("[WiFiManager] Max reconnect attempts exceeded. Restarting...");
+
+    // Safe to write NVS and restart here — we're in the main task
     if (_staticPrefs && _staticResetCounter)
     {
       (*_staticResetCounter)++;
@@ -118,7 +132,7 @@ void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
       _staticPrefs->end();
     }
 
-    delay(2000);
+    delay(500);
     ESP.restart();
   }
 }

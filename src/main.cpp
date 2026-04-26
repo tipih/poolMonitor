@@ -158,6 +158,9 @@ void loop()
   // Check the OTA handler (MUST be called frequently - FIRST priority)
   otaManager.handle();
 
+  // Handle WiFi reconnect/restart flags safely from the main task
+  wifiManager.handle();
+
   // During OTA update, minimize all operations to ensure OTA handler gets maximum CPU time
   // Only reset watchdog and return immediately to handle() as fast as possible
   if (otaManager.isUpdating())
