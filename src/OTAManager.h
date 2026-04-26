@@ -15,8 +15,12 @@ public:
   // Handle OTA updates (call in loop)
   void handle();
 
+  // Check if OTA update is in progress
+  bool isUpdating() const { return _isUpdating; }
+
 private:
   bool _initialized;
+  bool _isUpdating;
 };
 
 #endif // OTA_MANAGER_H

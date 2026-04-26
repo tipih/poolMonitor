@@ -10,6 +10,7 @@ class ScheduleManager;
 class TemperatureSensor;
 class TimeManager;
 class InputManager;
+class OTAManager;
 
 class WebServerManager
 {
@@ -17,7 +18,7 @@ public:
   WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp);
 
   void begin(const char *username, const char *password);
-  void setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, int *rssi);
+  void setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, int *rssi);
 
 private:
   AsyncWebServer _server;
@@ -32,6 +33,7 @@ private:
   // References to managers for state
   TimeManager *_timeManager;
   InputManager *_inputManager;
+  OTAManager *_otaManager;
   int *_rssi;
 
   // Handler methods

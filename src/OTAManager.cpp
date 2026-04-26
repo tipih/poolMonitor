@@ -1,7 +1,7 @@
 #include "OTAManager.h"
 
 OTAManager::OTAManager()
-  : _initialized(false) {
+  : _initialized(false), _isUpdating(false) {
 }
 
 void OTAManager::begin(const char* hostname, const char* password) {
@@ -16,7 +16,8 @@ void OTAManager::begin(const char* hostname, const char* password) {
   }
 
   // Configure OTA callbacks
-  ArduinoOTA.onStart([]() {
+  ArduinoOTA.onStart([this]() {
+    _isUpdating = true;
     String type;
     if (ArduinoOTA.getCommand() == U_FLASH) {
       type = "sketch";
@@ -26,7 +27,8 @@ void OTAManager::begin(const char* hostname, const char* password) {
     Serial.println("OTA: Start updating " + type);
   });
 
-  ArduinoOTA.onEnd([]() {
+  ArduinoOTA.onEnd([this]() {
+    _isUpdating = false;
     Serial.println("\nOTA: Update complete");
   });
 
@@ -34,7 +36,8 @@ void OTAManager::begin(const char* hostname, const char* password) {
     Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
   });
 
-  ArduinoOTA.onError([](ota_error_t error) {
+  ArduinoOTA.onError([this](ota_error_t error) {
+    _isUpdating = false;
     Serial.printf("OTA Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
       Serial.println("Auth Failed");

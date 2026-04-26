@@ -132,10 +132,12 @@ void setup()
 
   // Setup web server
   webServerManager.begin(http_username, http_password);
-  webServerManager.setManagerReferences(timeManager, inputManager, &rssi);
 
   // Initialize OTA Manager
   otaManager.begin();
+
+  // Set web server manager references (after OTA manager is initialized)
+  webServerManager.setManagerReferences(timeManager, inputManager, otaManager, &rssi);
 
   // Initialize pump controller
   pumpController.begin(GPIO_HIGH_SPEED, GPIO_LOW_SPEED, GPIO_MED_SPEED, GPIO_STOP);
@@ -155,6 +157,16 @@ void loop()
 {
   // Check the OTA handler (MUST be called frequently - FIRST priority)
   otaManager.handle();
+
+  // During OTA update, minimize all operations to ensure OTA handler gets maximum CPU time
+  // Only reset watchdog and return immediately to handle() as fast as possible
+  if (otaManager.isUpdating())
+  {
+    esp_task_wdt_reset();
+    return;
+  }
+
+  // Normal operations when not updating
 
   // Handle MQTT connection (non-blocking with timeout interval)
   if (wifiManager.isConnected())

@@ -5,12 +5,13 @@
 #include "TemperatureSensor.h"
 #include "TimeManager.h"
 #include "InputManager.h"
+#include "OTAManager.h"
 #include "html.h"
 
 WebServerManager::WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp)
     : _server(80), _pumpController(pump), _mqttManager(mqtt), _scheduleManager(schedule), _tempSensor(temp),
       _httpUsername(nullptr), _httpPassword(nullptr),
-      _timeManager(nullptr), _inputManager(nullptr), _rssi(nullptr)
+      _timeManager(nullptr), _inputManager(nullptr), _otaManager(nullptr), _rssi(nullptr)
 {
 }
 
@@ -48,10 +49,11 @@ void WebServerManager::begin(const char *username, const char *password)
   Serial.println("Web server started on port 80");
 }
 
-void WebServerManager::setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, int *rssi)
+void WebServerManager::setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, int *rssi)
 {
   _timeManager = &timeMgr;
   _inputManager = &inputMgr;
+  _otaManager = &otaMgr;
   _rssi = rssi;
 }
 
@@ -81,6 +83,13 @@ void WebServerManager::handleUpdate(AsyncWebServerRequest *request)
   Serial.println("Got an update");
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
+
+  // Block pump operations during OTA updates to prevent blocking delays
+  if (_otaManager && _otaManager->isUpdating())
+  {
+    request->send(503, "text/plain", "Service unavailable during OTA update");
+    return;
+  }
 
   if (request->params() == 1)
   {
