@@ -308,13 +308,16 @@ const char index_html[] PROGMEM = R"rawliteral(
      const onTime = document.getElementById('ontime').value;
      const offTime = document.getElementById('offtime').value;
      
+     // Use current values if fields are empty
+     const finalOnTime = onTime !== '' ? onTime : timeon;
+     const finalOffTime = offTime !== '' ? offTime : timeoff;
      
-     console.log(onTime);
-     console.log(offTime);
+     console.log(finalOnTime);
+     console.log(finalOffTime);
      
-     if ((!isNaN(parseInt(onTime)))  && (!isNaN(parseInt(offTime)))){
+     if ((!isNaN(parseInt(finalOnTime))) && (!isNaN(parseInt(finalOffTime)))){
       
-     xhr.open("GET", "/timeAdjust?onTime="+onTime+"&offTime="+offTime, true);
+     xhr.open("GET", "/timeAdjust?onTime="+finalOnTime+"&offTime="+finalOffTime, true);
      xhr.send();
     
     }
