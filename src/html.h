@@ -268,6 +268,19 @@ const char index_html[] PROGMEM = R"rawliteral(
 
 <script>
  var server_running = true;
+ var pumpSpeed;
+ var RelaxStatus;
+ var timeon = 6;  // Default values
+ var timeoff = 18;
+ var rssi;
+ var hh;
+ var mm;
+ var ss;
+ var dd;
+ var md;
+ var yy;
+ var temperatur;
+ 
  function logoutButton() {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "/logout", true);
@@ -344,18 +357,6 @@ const char index_html[] PROGMEM = R"rawliteral(
   
     if (this.readyState == 4 && this.status == 200) {
      const obj = JSON.parse(this.responseText);
-     var pumpSpeed;
-     var RelaxStatus;
-     var timeon;
-     var timeoff;
-     var rssi;
-     var hh;
-     var mm;
-     var ss;
-     var dd;
-     var md;
-     var yy;
-     var temperatur;
      server_running=true;
      console.log(obj.poolRelaxStatus);
      console.log(obj.pumpSpeed);
