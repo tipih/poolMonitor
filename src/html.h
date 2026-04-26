@@ -36,13 +36,13 @@ const char index_html[] PROGMEM = R"rawliteral(
         --primary-color: #11998e;
       }
       
-      /* Theme: Sunset */
-      body.theme-sunset {
-        --primary-start: #f12711;
-        --primary-end: #f5af19;
-        --accent-start: #ff9966;
-        --accent-end: #ff5e62;
-        --primary-color: #f12711;
+      /* Theme: Sand (Earth) */
+      body.theme-sand {
+        --primary-start: #c79a6c;
+        --primary-end: #8b6f47;
+        --accent-start: #d4a574;
+        --accent-end: #b8956a;
+        --primary-color: #c79a6c;
       }
       
       /* Theme: Night */
@@ -54,13 +54,13 @@ const char index_html[] PROGMEM = R"rawliteral(
         --primary-color: #3498db;
       }
       
-      /* Theme: Rose */
-      body.theme-rose {
-        --primary-start: #ec008c;
-        --primary-end: #fc6767;
-        --accent-start: #cc2b5e;
-        --accent-end: #753a88;
-        --primary-color: #ec008c;
+      /* Theme: Terracotta (Earth) */
+      body.theme-terracotta {
+        --primary-start: #c16e4f;
+        --primary-end: #8b5a3c;
+        --accent-start: #d4845c;
+        --accent-end: #a8694e;
+        --primary-color: #c16e4f;
       }
       
       * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -71,10 +71,63 @@ const char index_html[] PROGMEM = R"rawliteral(
         padding: 20px;
         color: #333;
         transition: background 0.5s ease;
+        position: relative;
+        overflow-x: hidden;
+      }
+      /* Animated pool water caustic light effect */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+          radial-gradient(ellipse at 30% 40%, rgba(255,255,255,0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 60%, rgba(255,255,255,0.12) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 80%, rgba(255,255,255,0.1) 0%, transparent 40%);
+        pointer-events: none;
+        z-index: 0;
+        animation: waterCaustics 15s ease-in-out infinite;
+      }
+      /* Second water layer for depth */
+      body::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+          radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 60%),
+          radial-gradient(circle at 80% 70%, rgba(255,255,255,0.06) 0%, transparent 60%);
+        pointer-events: none;
+        z-index: 0;
+        animation: waterCaustics 12s ease-in-out infinite reverse;
+      }
+      @keyframes waterCaustics {
+        0%, 100% { 
+          transform: translate(0, 0) scale(1);
+          opacity: 0.8;
+        }
+        25% { 
+          transform: translate(-3%, 2%) scale(1.05);
+          opacity: 1;
+        }
+        50% { 
+          transform: translate(2%, -2%) scale(0.95);
+          opacity: 0.7;
+        }
+        75% { 
+          transform: translate(-2%, 3%) scale(1.02);
+          opacity: 0.9;
+        }
       }
       .container {
         max-width: 800px;
         margin: 0 auto;
+        position: relative;
+        z-index: 1;
       }
       .header {
         background: white;
@@ -277,14 +330,14 @@ const char index_html[] PROGMEM = R"rawliteral(
       .theme-button.forest {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
       }
-      .theme-button.sunset {
-        background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);
+      .theme-button.sand {
+        background: linear-gradient(135deg, #c79a6c 0%, #8b6f47 100%);
       }
       .theme-button.night {
         background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
       }
-      .theme-button.rose {
-        background: linear-gradient(135deg, #ec008c 0%, #fc6767 100%);
+      .theme-button.terracotta {
+        background: linear-gradient(135deg, #c16e4f 0%, #8b5a3c 100%);
       }
       @media (max-width: 600px) {
         .pump-controls {
@@ -312,9 +365,9 @@ const char index_html[] PROGMEM = R"rawliteral(
         <div class="theme-selector">
           <div class="theme-button ocean active" onclick="setTheme('ocean')" title="Ocean"></div>
           <div class="theme-button forest" onclick="setTheme('forest')" title="Forest"></div>
-          <div class="theme-button sunset" onclick="setTheme('sunset')" title="Sunset"></div>
+          <div class="theme-button sand" onclick="setTheme('sand')" title="Sand"></div>
           <div class="theme-button night" onclick="setTheme('night')" title="Night"></div>
-          <div class="theme-button rose" onclick="setTheme('rose')" title="Rose"></div>
+          <div class="theme-button terracotta" onclick="setTheme('terracotta')" title="Terracotta"></div>
         </div>
       </div>
       <div class="card">
@@ -370,7 +423,7 @@ const char index_html[] PROGMEM = R"rawliteral(
  // Theme management
  function setTheme(themeName) {
    // Remove all theme classes
-   document.body.classList.remove('theme-ocean', 'theme-forest', 'theme-sunset', 'theme-night', 'theme-rose');
+   document.body.classList.remove('theme-ocean', 'theme-forest', 'theme-sand', 'theme-night', 'theme-terracotta');
    
    // Add new theme class
    document.body.classList.add('theme-' + themeName);
