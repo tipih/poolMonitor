@@ -140,6 +140,9 @@ void setup()
   // Initialize pump controller
   pumpController.begin(GPIO_HIGH_SPEED, GPIO_LOW_SPEED, GPIO_MED_SPEED, GPIO_STOP);
 
+  // Initialize schedule manager with dependencies and load from NVM
+  scheduleManager.begin(pumpController, mqttManager);
+
   Serial.println("Setup complete!");
 }
 //******************************************************************************
