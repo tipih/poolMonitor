@@ -12,11 +12,11 @@ TemperatureSensor::TemperatureSensor()
 
 TemperatureSensor::~TemperatureSensor() {
   if (_sensors) {
-    delete _sensors;
+    _sensors->~DallasTemperature();
     _sensors = nullptr;
   }
   if (_oneWire) {
-    delete _oneWire;
+    _oneWire->~OneWire();
     _oneWire = nullptr;
   }
 }
@@ -25,9 +25,9 @@ void TemperatureSensor::begin(uint8_t oneWirePin, float calibrationOffset) {
   _pin = oneWirePin;
   _calibrationOffset = calibrationOffset;
   
-  // Create OneWire and DallasTemperature instances
-  _oneWire = new OneWire(_pin);
-  _sensors = new DallasTemperature(_oneWire);
+  // Use placement new to construct objects in pre-allocated buffers (no heap allocation)
+  _oneWire = new (_oneWireBuffer) OneWire(_pin);
+  _sensors = new (_sensorsBuffer) DallasTemperature(_oneWire);
   
   // Initialize the sensor
   _sensors->begin();

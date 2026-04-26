@@ -91,7 +91,6 @@ void MQTTManager::reconnect()
       {
         publishHADiscovery();
         _discoveryPublished = true;
-        delay(100); // Small delay after publishing discovery to avoid overwhelming broker
       }
     }
     else

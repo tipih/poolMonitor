@@ -30,6 +30,8 @@ private:
   const char *_password;
   Preferences *_preferences;
   unsigned long _resetCounter;
+  static int _reconnectAttempts;
+  static const int _maxReconnectAttempts = 5;
 
   // Event handlers
   static void onStationConnected(WiFiEvent_t event, WiFiEventInfo_t info);

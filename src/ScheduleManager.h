@@ -13,13 +13,13 @@ public:
   // Constructor
   ScheduleManager();
 
-  // Initialize with preferences namespace
-  void begin(const char* preferencesNamespace = "poolPump");
+  // Initialize with preferences namespace and required dependencies
+  void begin(PumpController &pumpController, MQTTManager &mqttManager, const char* preferencesNamespace = "poolPump");
 
   // Get/Set schedule hours
-  unsigned long getOnHour() const;
-  unsigned long getOffHour() const;
-  void setSchedule(unsigned long onHour, unsigned long offHour);
+  uint8_t getOnHour() const;
+  uint8_t getOffHour() const;
+  void setSchedule(uint8_t onHour, uint8_t offHour);
 
   // Load schedule from NVM
   void loadFromNVM();
@@ -28,16 +28,18 @@ public:
   void saveToNVM();
 
   // Validate schedule hours
-  bool isValidSchedule(unsigned long onHour, unsigned long offHour) const;
+  bool isValidSchedule(uint8_t onHour, uint8_t offHour) const;
 
   // Check and execute schedule based on current hour
-  void checkAndExecute(unsigned long currentHour, PumpController &pumpController, MQTTManager &mqttManager);
+  void checkAndExecute(uint8_t currentHour);
 
 private:
-  unsigned long _onHour;
-  unsigned long _offHour;
+  uint8_t _onHour;
+  uint8_t _offHour;
   const char* _preferencesNamespace;
   Preferences _preferences;
+  PumpController* _pumpController;
+  MQTTManager* _mqttManager;
 };
 
 #endif // SCHEDULE_MANAGER_H

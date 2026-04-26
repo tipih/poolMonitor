@@ -5,6 +5,7 @@
 WiFiManager *WiFiManager::_instance = nullptr;
 Preferences *WiFiManager::_staticPrefs = nullptr;
 unsigned long *WiFiManager::_staticResetCounter = nullptr;
+int WiFiManager::_reconnectAttempts = 0;
 
 WiFiManager::WiFiManager()
 {
@@ -44,9 +45,9 @@ void WiFiManager::begin(const char *ssid, const char *password, Preferences *pre
   Serial.println(_ssid);
 
   // Register WiFi event handlers
-  WiFi.onEvent(onStationConnected, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+  WiFi.onEvent(onStationConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(onGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(onStationDisconnected, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+  WiFi.onEvent(onStationDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   // Start WiFi connection
   WiFi.begin(_ssid, _password);
@@ -87,6 +88,9 @@ void WiFiManager::onGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
   Serial.println("WiFi connected");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  
+  // Reset reconnect attempts on successful connection
+  _reconnectAttempts = 0;
 }
 
 void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -94,18 +98,36 @@ void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
   Serial.println("Disconnected from WiFi access point");
   Serial.print("WiFi lost connection. Reason: ");
   Serial.println(info.wifi_sta_disconnected.reason);
-  Serial.println("Trying to Reconnect");
+  
+  _reconnectAttempts++;
+  Serial.print("Reconnect attempt: ");
+  Serial.print(_reconnectAttempts);
+  Serial.print("/");
+  Serial.println(_maxReconnectAttempts);
 
-  // Increment reset counter and save to preferences
-  if (_staticPrefs && _staticResetCounter)
+  if (_reconnectAttempts < _maxReconnectAttempts)
   {
-    (*_staticResetCounter)++;
-    _staticPrefs->begin("reset", false);
-    _staticPrefs->putLong("resetCounter", *_staticResetCounter);
-    _staticPrefs->end();
+    // Try to reconnect
+    Serial.println("Trying to reconnect...");
+    WiFi.disconnect();
+    delay(1000);
+    WiFi.begin();
   }
+  else
+  {
+    // Max retries exceeded, restart ESP
+    Serial.println("Max reconnect attempts exceeded. Restarting...");
+    
+    // Increment reset counter and save to preferences
+    if (_staticPrefs && _staticResetCounter)
+    {
+      (*_staticResetCounter)++;
+      _staticPrefs->begin("reset", false);
+      _staticPrefs->putLong("resetCounter", *_staticResetCounter);
+      _staticPrefs->end();
+    }
 
-  // Restart ESP to reconnect
-  delay(2000);
-  ESP.restart();
+    delay(2000);
+    ESP.restart();
+  }
 }

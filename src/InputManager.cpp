@@ -37,11 +37,6 @@ void InputManager::update()
     {
       _buttonState = data;
       _currentRelaxStatus = data;
-
-      if (_buttonState == HIGH)
-      {
-        _ledState = !_ledState;
-      }
     }
   }
 

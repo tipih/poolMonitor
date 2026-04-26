@@ -110,9 +110,6 @@ void setup()
   Serial.begin(115200);
   delay(500);
 
-  // Initialize schedule manager and load from NVM
-  scheduleManager.begin();
-
   // Initialize temperature sensor
   temperatureSensor.begin(GPIO_ONE_WIRE, TEMP_CALIBRATION_OFFSET);
 
@@ -189,6 +186,6 @@ void loop()
   if ((millis() - lastLoopDelay) >= PUMP_CHECK_INTERVAL)
   {
     lastLoopDelay = millis();
-    scheduleManager.checkAndExecute(timeManager.getHour(), pumpController, mqttManager);
+    scheduleManager.checkAndExecute(timeManager.getHour());
   }
 }

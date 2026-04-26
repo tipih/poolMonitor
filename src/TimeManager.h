@@ -13,20 +13,20 @@ public:
   void update();
 
   // Getters for time components
-  unsigned long getHour() const { return _currentHour; }
-  unsigned long getMinute() const { return _currentMinute; }
-  unsigned long getSecond() const { return _currentSec; }
-  unsigned long getDay() const { return _currentDay; }
-  unsigned long getMonth() const { return _currentMd; }
-  unsigned long getYear() const { return _currentYr; }
+  uint8_t getHour() const { return _currentHour; }
+  uint8_t getMinute() const { return _currentMinute; }
+  uint8_t getSecond() const { return _currentSec; }
+  uint8_t getDay() const { return _currentDay; }
+  uint8_t getMonth() const { return _currentMd; }
+  uint16_t getYear() const { return _currentYr; }
 
 private:
-  unsigned long _currentSec;
-  unsigned long _currentDay;
-  unsigned long _currentMd;
-  unsigned long _currentYr;
-  unsigned long _currentHour;
-  unsigned long _currentMinute;
+  uint8_t _currentSec;
+  uint8_t _currentDay;
+  uint8_t _currentMd;
+  uint16_t _currentYr;
+  uint8_t _currentHour;
+  uint8_t _currentMinute;
   unsigned long _previousTime;
 };
 

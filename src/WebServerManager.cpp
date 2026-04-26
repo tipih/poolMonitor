@@ -93,22 +93,22 @@ void WebServerManager::handleUpdate(AsyncWebServerRequest *request)
     if (value == "LowOff")
     {
       _pumpController.setLowSpeed();
-      _mqttManager.publishToSubtopic("pump_speed", "Low");
+      _mqttManager.publishToSubtopic("pump_speed", _pumpController.getSpeedString());
     }
     else if (value == "HighOff")
     {
       _pumpController.setHighSpeed();
-      _mqttManager.publishToSubtopic("pump_speed", "High");
+      _mqttManager.publishToSubtopic("pump_speed", _pumpController.getSpeedString());
     }
     else if (value == "MedOff")
     {
       _pumpController.setMedSpeed();
-      _mqttManager.publishToSubtopic("pump_speed", "Medium");
+      _mqttManager.publishToSubtopic("pump_speed", _pumpController.getSpeedString());
     }
     else if (value == "StopOff")
     {
       _pumpController.setStop();
-      _mqttManager.publishToSubtopic("pump_speed", "Stopped");
+      _mqttManager.publishToSubtopic("pump_speed", _pumpController.getSpeedString());
     }
   }
 
@@ -124,8 +124,8 @@ void WebServerManager::handleTimeAdjust(AsyncWebServerRequest *request)
 
   if (request->params() > 1)
   {
-    unsigned long onTime = request->getParam(0)->value().toInt();
-    unsigned long offTime = request->getParam(1)->value().toInt();
+    uint8_t onTime = request->getParam(0)->value().toInt();
+    uint8_t offTime = request->getParam(1)->value().toInt();
 
     Serial.print("New schedule: ON=");
     Serial.print(onTime);
@@ -146,7 +146,7 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
     return request->requestAuthentication();
 
   char buffer[200];
-  sprintf(buffer, "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%lu\",\"offTime\":\"%lu\",\"rssi\":\"%d\",\"hh\":\"%02lu\",\"mm\":\"%02lu\",\"ss\":\"%02lu\",\"dd\":\"%02lu\",\"md\":\"%02lu\",\"yy\":\"%02lu\",\"currentTemp\":\"%.2f\"}",
+  snprintf(buffer, sizeof(buffer), "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\",\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\",\"currentTemp\":\"%.2f\"}",
           _inputManager->getRelaxStatus(),
           _pumpController.getCurrentSpeed(),
           _scheduleManager.getOnHour(),

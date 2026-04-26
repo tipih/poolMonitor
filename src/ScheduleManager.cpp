@@ -5,23 +5,27 @@
 ScheduleManager::ScheduleManager()
   : _onHour(6),
     _offHour(18),
-    _preferencesNamespace("poolPump") {
+    _preferencesNamespace("poolPump"),
+    _pumpController(nullptr),
+    _mqttManager(nullptr) {
 }
 
-void ScheduleManager::begin(const char* preferencesNamespace) {
+void ScheduleManager::begin(PumpController &pumpController, MQTTManager &mqttManager, const char* preferencesNamespace) {
+  _pumpController = &pumpController;
+  _mqttManager = &mqttManager;
   _preferencesNamespace = preferencesNamespace;
   loadFromNVM();
 }
 
-unsigned long ScheduleManager::getOnHour() const {
+uint8_t ScheduleManager::getOnHour() const {
   return _onHour;
 }
 
-unsigned long ScheduleManager::getOffHour() const {
+uint8_t ScheduleManager::getOffHour() const {
   return _offHour;
 }
 
-void ScheduleManager::setSchedule(unsigned long onHour, unsigned long offHour) {
+void ScheduleManager::setSchedule(uint8_t onHour, uint8_t offHour) {
   if (isValidSchedule(onHour, offHour)) {
     _onHour = onHour;
     _offHour = offHour;
@@ -39,8 +43,8 @@ void ScheduleManager::setSchedule(unsigned long onHour, unsigned long offHour) {
 
 void ScheduleManager::loadFromNVM() {
   _preferences.begin(_preferencesNamespace, false);
-  _onHour = _preferences.getLong("onHour", 6);
-  _offHour = _preferences.getLong("offHour", 18);
+  _onHour = _preferences.getUChar("onHour", 6);
+  _offHour = _preferences.getUChar("offHour", 18);
   _preferences.end();
 
   if (!isValidSchedule(_onHour, _offHour)) {
@@ -59,29 +63,34 @@ void ScheduleManager::loadFromNVM() {
 
 void ScheduleManager::saveToNVM() {
   _preferences.begin(_preferencesNamespace, false);
-  _preferences.putLong("onHour", _onHour);
-  _preferences.putLong("offHour", _offHour);
+  _preferences.putUChar("onHour", _onHour);
+  _preferences.putUChar("offHour", _offHour);
   _preferences.end();
   
   Serial.println("Schedule saved to NVM");
 }
 
-bool ScheduleManager::isValidSchedule(unsigned long onHour, unsigned long offHour) const {
-  return (onHour >= 0 && onHour < 24 && offHour >= 0 && offHour < 24);
+bool ScheduleManager::isValidSchedule(uint8_t onHour, uint8_t offHour) const {
+  return (onHour < 24 && offHour < 24);
 }
 
-void ScheduleManager::checkAndExecute(unsigned long currentHour, PumpController &pumpController, MQTTManager &mqttManager) {
+void ScheduleManager::checkAndExecute(uint8_t currentHour) {
+  if (!_pumpController || !_mqttManager) {
+    Serial.println("Error: ScheduleManager not properly initialized");
+    return;
+  }
+
   // Check if it is time to turn on to medium speed
-  if ((currentHour == _onHour) && (pumpController.getCurrentSpeed() != PumpController::MED_SPEED))
+  if ((currentHour == _onHour) && (_pumpController->getCurrentSpeed() != PumpController::MED_SPEED))
   {
-    pumpController.setMedSpeed();
-    mqttManager.publishToSubtopic("pump_speed", "Medium");
+    _pumpController->setMedSpeed();
+    _mqttManager->publishToSubtopic("pump_speed", _pumpController->getSpeedString());
   }
   
   // Check if it is time to turn off to low speed
-  if ((currentHour == _offHour) && (pumpController.getCurrentSpeed() != PumpController::LOW_SPEED))
+  if ((currentHour == _offHour) && (_pumpController->getCurrentSpeed() != PumpController::LOW_SPEED))
   {
-    pumpController.setLowSpeed();
-    mqttManager.publishToSubtopic("pump_speed", "Low");
+    _pumpController->setLowSpeed();
+    _mqttManager->publishToSubtopic("pump_speed", _pumpController->getSpeedString());
   }
 }

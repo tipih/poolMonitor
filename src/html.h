@@ -1,4 +1,7 @@
-#include <Arduino.h>
+#ifndef HTML_H
+#define HTML_H
+
+// PROGMEM strings for web interface
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
   <head>
@@ -469,3 +472,5 @@ const char logout_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
+#endif // HTML_H

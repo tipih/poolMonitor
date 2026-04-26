@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <new>
 
 class TemperatureSensor {
 public:
@@ -29,6 +30,9 @@ public:
   unsigned long getLastReadTime() const;
 
 private:
+  // Use aligned storage to avoid heap allocation
+  alignas(OneWire) uint8_t _oneWireBuffer[sizeof(OneWire)];
+  alignas(DallasTemperature) uint8_t _sensorsBuffer[sizeof(DallasTemperature)];
   OneWire* _oneWire;
   DallasTemperature* _sensors;
   float _calibrationOffset;
