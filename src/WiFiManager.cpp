@@ -5,6 +5,8 @@
 Preferences *WiFiManager::_staticPrefs = nullptr;
 unsigned long *WiFiManager::_staticResetCounter = nullptr;
 int WiFiManager::_reconnectAttempts = 0;
+unsigned long WiFiManager::_reconnectAt = 0;
+bool WiFiManager::_initialized = false;
 volatile bool WiFiManager::_shouldReconnect = false;
 volatile bool WiFiManager::_shouldRestart = false;
 
@@ -53,6 +55,7 @@ void WiFiManager::begin(const char *ssid, const char *password, Preferences *pre
 
   Serial.println("Waiting for WiFi connection...");
   delay(3000);
+  _initialized = true;
 }
 
 bool WiFiManager::isConnected()
@@ -82,8 +85,9 @@ void WiFiManager::onGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   
-  // Reset reconnect attempts on successful connection
+  // Reset reconnect state on successful connection
   _reconnectAttempts = 0;
+  _reconnectAt = 0;
 }
 
 void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -91,6 +95,11 @@ void WiFiManager::onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
   // WARNING: This runs inside the ESP-IDF WiFi task.
   // Do NOT call WiFi API, delay(), NVS/Preferences, or ESP.restart() here —
   // they can deadlock or corrupt state. Only set flags; handle() acts on them.
+
+  // Ignore disconnect events that fire during initial connection in begin()
+  if (!_initialized)
+    return;
+
   Serial.println("Disconnected from WiFi access point");
   Serial.print("WiFi lost connection. Reason: ");
   Serial.println(info.wifi_sta_disconnected.reason);
@@ -111,11 +120,25 @@ void WiFiManager::handle()
 {
   if (_shouldReconnect)
   {
-    _shouldReconnect = false;
-    Serial.println("[WiFiManager] Reconnecting from main task...");
-    WiFi.disconnect();
-    delay(1000);
-    WiFi.begin(_ssid, _password);
+    // Schedule backoff window on first call after disconnect
+    if (_reconnectAt == 0)
+    {
+      // Exponential backoff: 2^attempt seconds, capped at 32s
+      unsigned long backoffMs = min(32000UL, (1UL << min(_reconnectAttempts, 5)) * 1000UL);
+      _reconnectAt = millis() + backoffMs;
+      Serial.print("[WiFiManager] Backoff ");
+      Serial.print(backoffMs / 1000);
+      Serial.println("s before reconnect...");
+    }
+
+    if (millis() >= _reconnectAt)
+    {
+      _shouldReconnect = false;
+      _reconnectAt = 0;
+      Serial.println("[WiFiManager] Reconnecting from main task...");
+      WiFi.disconnect();
+      WiFi.begin(_ssid, _password);
+    }
   }
 
   if (_shouldRestart)

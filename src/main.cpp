@@ -158,16 +158,18 @@ void loop()
   // Check the OTA handler (MUST be called frequently - FIRST priority)
   otaManager.handle();
 
-  // Handle WiFi reconnect/restart flags safely from the main task
-  wifiManager.handle();
-
   // During OTA update, minimize all operations to ensure OTA handler gets maximum CPU time
   // Only reset watchdog and return immediately to handle() as fast as possible
+  // NOTE: wifiManager.handle() is intentionally skipped here — acting on reconnect/restart
+  // flags while a transfer is in progress would abort the OTA at the worst possible moment.
   if (otaManager.isUpdating())
   {
     esp_task_wdt_reset();
     return;
   }
+
+  // Handle WiFi reconnect/restart flags safely from the main task
+  wifiManager.handle();
 
   // Normal operations when not updating
 

@@ -32,6 +32,8 @@ private:
   unsigned long _resetCounter;
   static int _reconnectAttempts;
   static const int _maxReconnectAttempts = 5;
+  static unsigned long _reconnectAt;  // millis() timestamp for next reconnect attempt
+  static bool _initialized;           // true after begin() completes; ignores events before then
 
   // Flags set by event handlers (ISR-safe bools), acted on in handle()
   static volatile bool _shouldReconnect;
