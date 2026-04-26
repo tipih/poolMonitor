@@ -10,13 +10,67 @@ const char index_html[] PROGMEM = R"rawliteral(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,">
     <style>
+      :root {
+        --primary-start: #667eea;
+        --primary-end: #764ba2;
+        --accent-start: #f093fb;
+        --accent-end: #f5576c;
+        --primary-color: #667eea;
+      }
+      
+      /* Theme: Ocean (default) */
+      body.theme-ocean {
+        --primary-start: #667eea;
+        --primary-end: #764ba2;
+        --accent-start: #f093fb;
+        --accent-end: #f5576c;
+        --primary-color: #667eea;
+      }
+      
+      /* Theme: Forest */
+      body.theme-forest {
+        --primary-start: #11998e;
+        --primary-end: #38ef7d;
+        --accent-start: #56ab2f;
+        --accent-end: #a8e063;
+        --primary-color: #11998e;
+      }
+      
+      /* Theme: Sunset */
+      body.theme-sunset {
+        --primary-start: #f12711;
+        --primary-end: #f5af19;
+        --accent-start: #ff9966;
+        --accent-end: #ff5e62;
+        --primary-color: #f12711;
+      }
+      
+      /* Theme: Night */
+      body.theme-night {
+        --primary-start: #2c3e50;
+        --primary-end: #3498db;
+        --accent-start: #8e44ad;
+        --accent-end: #3498db;
+        --primary-color: #3498db;
+      }
+      
+      /* Theme: Rose */
+      body.theme-rose {
+        --primary-start: #ec008c;
+        --primary-end: #fc6767;
+        --accent-start: #cc2b5e;
+        --accent-end: #753a88;
+        --primary-color: #ec008c;
+      }
+      
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { 
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-start) 0%, var(--primary-end) 100%);
         min-height: 100vh;
         padding: 20px;
         color: #333;
+        transition: background 0.5s ease;
       }
       .container {
         max-width: 800px;
@@ -31,7 +85,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
       .header h1 {
         font-size: 28px;
-        color: #667eea;
+        color: var(--primary-color);
         margin-bottom: 12px;
         font-weight: 600;
       }
@@ -62,7 +116,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       .temp-display {
         font-size: 18px;
         font-weight: 600;
-        color: #667eea;
+        color: var(--primary-color);
       }
       .card {
         background: white;
@@ -94,7 +148,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         font-weight: 500;
         text-align: center;
         color: #fff;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-start) 0%, var(--primary-end) 100%);
         border: none;
         border-radius: 12px;
         cursor: pointer;
@@ -114,7 +168,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
       }
       .button.secondary {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        background: linear-gradient(135deg, var(--accent-start) 0%, var(--accent-end) 100%);
         box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
       }
       .button.secondary:hover {
@@ -123,7 +177,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       .speed-display {
         text-align: center;
         padding: 16px;
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        background: linear-gradient(135deg, var(--accent-start) 0%, var(--accent-end) 100%);
         border-radius: 12px;
         color: white;
         font-size: 18px;
@@ -158,7 +212,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
       .time-row span {
         font-weight: 600;
-        color: #667eea;
+        color: var(--primary-color);
         font-size: 18px;
       }
       .time-input-group {
@@ -185,13 +239,52 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
       input[type="number"]:focus {
         outline: none;
-        border-color: #667eea;
+        border-color: var(--primary-color);
       }
       .button-group {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
         gap: 12px;
         margin-top: 16px;
+      }
+      .theme-selector {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .theme-button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 3px solid white;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      .theme-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      }
+      .theme-button.active {
+        border-color: #333;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        transform: scale(1.15);
+      }
+      .theme-button.ocean {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+      .theme-button.forest {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      }
+      .theme-button.sunset {
+        background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);
+      }
+      .theme-button.night {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+      }
+      .theme-button.rose {
+        background: linear-gradient(135deg, #ec008c 0%, #fc6767 100%);
       }
       @media (max-width: 600px) {
         .pump-controls {
@@ -215,6 +308,13 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="status-item">
             <span class="temp-display" id="status_temp">🌡️ -999°C</span>
           </div>
+        </div>
+        <div class="theme-selector">
+          <div class="theme-button ocean active" onclick="setTheme('ocean')" title="Ocean"></div>
+          <div class="theme-button forest" onclick="setTheme('forest')" title="Forest"></div>
+          <div class="theme-button sunset" onclick="setTheme('sunset')" title="Sunset"></div>
+          <div class="theme-button night" onclick="setTheme('night')" title="Night"></div>
+          <div class="theme-button rose" onclick="setTheme('rose')" title="Rose"></div>
         </div>
       </div>
       <div class="card">
@@ -267,6 +367,33 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
 <script>
+ // Theme management
+ function setTheme(themeName) {
+   // Remove all theme classes
+   document.body.classList.remove('theme-ocean', 'theme-forest', 'theme-sunset', 'theme-night', 'theme-rose');
+   
+   // Add new theme class
+   document.body.classList.add('theme-' + themeName);
+   
+   // Update active state on buttons
+   document.querySelectorAll('.theme-button').forEach(btn => {
+     btn.classList.remove('active');
+   });
+   document.querySelector('.theme-button.' + themeName).classList.add('active');
+   
+   // Save theme preference in localStorage
+   localStorage.setItem('poolMonitorTheme', themeName);
+ }
+ 
+ // Load saved theme on page load
+ function loadSavedTheme() {
+   const savedTheme = localStorage.getItem('poolMonitorTheme') || 'ocean';
+   setTheme(savedTheme);
+ }
+ 
+ // Load theme when page loads
+ loadSavedTheme();
+ 
  var server_running = true;
  var pumpSpeed;
  var RelaxStatus;
