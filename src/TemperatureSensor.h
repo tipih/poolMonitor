@@ -23,12 +23,6 @@ public:
   // Force a new temperature reading
   float readTemperature();
 
-  // Check if sensor is connected
-  bool isConnected();
-
-  // Get last reading time
-  unsigned long getLastReadTime() const;
-
 private:
   // Use aligned storage to avoid heap allocation
   alignas(OneWire) uint8_t _oneWireBuffer[sizeof(OneWire)];
@@ -42,4 +36,4 @@ private:
   bool _initialized;
 };
 
-#endif // TEMPERATURE_SENSOR_H // TEMPERATURE_SENSOR_H
+#endif // TEMPERATURE_SENSOR_H

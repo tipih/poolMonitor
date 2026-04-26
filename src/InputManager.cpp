@@ -7,7 +7,7 @@ InputManager::InputManager()
 {
 }
 
-void InputManager::begin(int buttonPin, int ledPin, unsigned long debounceDelay, unsigned long ledBlinkInterval)
+void InputManager::begin(uint8_t buttonPin, uint8_t ledPin, unsigned long debounceDelay, unsigned long ledBlinkInterval)
 {
   _buttonPin = buttonPin;
   _ledPin = ledPin;

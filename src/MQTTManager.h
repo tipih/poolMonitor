@@ -32,9 +32,6 @@ public:
   // Force republish of HA discovery on next connection
   void resetDiscovery() { _discoveryPublished = false; }
 
-  // Get the PubSubClient instance for advanced usage if needed
-  PubSubClient &getClient();
-
 private:
   WiFiClient _espClient;
   PubSubClient _mqttClient;

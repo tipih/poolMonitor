@@ -204,8 +204,3 @@ void MQTTManager::publishHADiscovery()
 
   Serial.println("Home Assistant discovery configs published");
 }
-
-PubSubClient &MQTTManager::getClient()
-{
-  return _mqttClient;
-}

@@ -8,14 +8,14 @@ class InputManager
 public:
   InputManager();
 
-  void begin(int buttonPin, int ledPin, unsigned long debounceDelay, unsigned long ledBlinkInterval);
+  void begin(uint8_t buttonPin, uint8_t ledPin, unsigned long debounceDelay, unsigned long ledBlinkInterval);
   void update();
 
   int getRelaxStatus() const { return _currentRelaxStatus; }
 
 private:
-  int _buttonPin;
-  int _ledPin;
+  uint8_t _buttonPin;
+  uint8_t _ledPin;
   unsigned long _debounceDelay;
   unsigned long _ledBlinkInterval;
 

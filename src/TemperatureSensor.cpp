@@ -67,17 +67,3 @@ float TemperatureSensor::readTemperature() {
     return _currentTemp;
   }
 }
-
-bool TemperatureSensor::isConnected() {
-  if (!_initialized) {
-    return false;
-  }
-  
-  _sensors->requestTemperatures();
-  float tempC = _sensors->getTempCByIndex(0);
-  return (tempC != DEVICE_DISCONNECTED_C);
-}
-
-unsigned long TemperatureSensor::getLastReadTime() const {
-  return _lastReadTime;
-}

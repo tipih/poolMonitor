@@ -2,14 +2,12 @@
 #include <Arduino.h>
 
 // Static member initialization
-WiFiManager *WiFiManager::_instance = nullptr;
 Preferences *WiFiManager::_staticPrefs = nullptr;
 unsigned long *WiFiManager::_staticResetCounter = nullptr;
 int WiFiManager::_reconnectAttempts = 0;
 
 WiFiManager::WiFiManager()
 {
-  _instance = this;
   _ssid = nullptr;
   _password = nullptr;
   _preferences = nullptr;
@@ -18,7 +16,6 @@ WiFiManager::WiFiManager()
 
 WiFiManager::~WiFiManager()
 {
-  _instance = nullptr;
 }
 
 void WiFiManager::begin(const char *ssid, const char *password, Preferences *prefs)
@@ -69,12 +66,6 @@ int WiFiManager::getRSSI()
 IPAddress WiFiManager::getLocalIP()
 {
   return WiFi.localIP();
-}
-
-void WiFiManager::handle()
-{
-  // Currently no periodic handling needed
-  // WiFi events are handled automatically
 }
 
 // Static event handlers

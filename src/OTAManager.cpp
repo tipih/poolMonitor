@@ -61,15 +61,3 @@ void OTAManager::handle() {
     ArduinoOTA.handle();
   }
 }
-
-void OTAManager::setPassword(const char* password) {
-  if (password != nullptr) {
-    ArduinoOTA.setPassword(password);
-  }
-}
-
-void OTAManager::setHostname(const char* hostname) {
-  if (hostname != nullptr) {
-    ArduinoOTA.setHostname(hostname);
-  }
-}

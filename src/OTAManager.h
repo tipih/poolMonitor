@@ -15,12 +15,6 @@ public:
   // Handle OTA updates (call in loop)
   void handle();
 
-  // Set password after initialization
-  void setPassword(const char* password);
-
-  // Set hostname after initialization
-  void setHostname(const char* hostname);
-
 private:
   bool _initialized;
 };

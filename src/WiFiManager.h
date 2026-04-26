@@ -22,9 +22,6 @@ public:
   // Get local IP address
   IPAddress getLocalIP();
 
-  // Handle WiFi events (call from main loop if needed)
-  void handle();
-
 private:
   const char *_ssid;
   const char *_password;
@@ -38,8 +35,7 @@ private:
   static void onGotIP(WiFiEvent_t event, WiFiEventInfo_t info);
   static void onStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info);
 
-  // Store pointer to instance for static callbacks
-  static WiFiManager *_instance;
+  // Static members for event handlers
   static Preferences *_staticPrefs;
   static unsigned long *_staticResetCounter;
 };
