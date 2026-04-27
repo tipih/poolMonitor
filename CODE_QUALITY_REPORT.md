@@ -2,132 +2,116 @@
 
 ## Dead Code (Unused Functions/Variables)
 
-### 1. WiFiManager
-- **`WiFiManager::handle()`** - Defined but never called
-  - Location: WiFiManager.h line 27, WiFiManager.cpp line 74
-  - Impact: Low - WiFi events are handled automatically via callbacks
-  - Recommendation: Remove or document as reserved for future use
+All previously reported dead code has been removed. No new dead code found.
 
-- **`WiFiManager::_instance`** - Static pointer set but never used
-  - Location: WiFiManager.h line 42, WiFiManager.cpp lines 5, 12, 21
-  - Impact: Low - Wastes 4 bytes of memory
-  - Recommendation: Remove if not needed for future callback access
+### Previously Reported — Now Fixed
 
-### 2. TemperatureSensor
-- **`TemperatureSensor::getLastReadTime()`** - Defined but never called
-  - Location: TemperatureSensor.h line 30, TemperatureSensor.cpp line 81
-  - Impact: Low
-  - Recommendation: Remove or use for monitoring/debugging
-
-- **`TemperatureSensor::isConnected()`** - Defined but never called
-  - Location: TemperatureSensor.h line 27, TemperatureSensor.cpp line 71
-  - Impact: Low
-  - Recommendation: Remove or expose via web interface
-
-- **Duplicate header guard** at end of TemperatureSensor.h line 45
-  - `#endif // TEMPERATURE_SENSOR_H // TEMPERATURE_SENSOR_H`
-  - Recommendation: Fix to single comment
-
-### 3. MQTTManager
-- **`MQTTManager::getClient()`** - Defined but never called
-  - Location: MQTTManager.h line 36, MQTTManager.cpp line 208
-  - Impact: Low
-  - Recommendation: Remove or keep for advanced MQTT callback configuration
-
-### 4. OTAManager
-- **`OTAManager::setPassword()`** - Defined but never called
-  - Location: OTAManager.h line 19, OTAManager.cpp line 65
-  - Impact: Low - Password can be set during begin()
-  - Recommendation: Remove or document as API for runtime changes
-
-- **`OTAManager::setHostname()`** - Defined but never called
-  - Location: OTAManager.h line 22, OTAManager.cpp line 71
-  - Impact: Low - Hostname can be set during begin()
-  - Recommendation: Remove or document as API for runtime changes
+- **`WiFiManager::handle()`** — **FIXED**: Fully implemented with exponential-backoff
+  reconnect logic and called from `loop()` in main.cpp.
+- **`WiFiManager::_instance`** — **FIXED**: Static singleton pointer removed; replaced
+  with purpose-specific static helpers (`_staticPrefs`, `_staticResetCounter`).
+- **`TemperatureSensor::getLastReadTime()`** — **FIXED**: Method removed.
+- **`TemperatureSensor::isConnected()`** — **FIXED**: Method removed.
+- **Duplicate header guard in TemperatureSensor.h** — **FIXED**: Now a single
+  `#endif // TEMPERATURE_SENSOR_H`.
+- **`MQTTManager::getClient()`** — **FIXED**: Method removed.
+- **`OTAManager::setPassword()`** — **FIXED**: Functionality folded into `begin()`.
+- **`OTAManager::setHostname()`** — **FIXED**: Functionality folded into `begin()`.
 
 ## Code Quality Issues
 
-### 1. PumpController - Blocking Delays
-**Severity: HIGH**
-- Multiple `delay()` calls throughout pump control methods
-- Location: PumpController.cpp lines 29, 30, 39-44, 52-57, 66-71, 80-85
-- Each speed change blocks for ~700ms total (4 × 100ms + 2 × 150ms)
-- **Impact**: Blocks main loop, delays OTA handling, MQTT processing, watchdog reset
-- **Recommendation**: Implement non-blocking state machine
+### 1. PumpController — Blocking Delays
+**Severity: HIGH** | **Status: OPEN**
+- Multiple `delay()` calls in every speed-change method.
+- Location: PumpController.cpp lines 31–33, 39–46, 51–58, 64–71, 78–85
+- Each speed change blocks ~1300 ms total (3 × 100 ms pin release + 2 × 500 ms pulse)
+- **Impact**: Blocks main loop during the call; OTA handling, MQTT `loop()`, watchdog
+  resets, and schedule checks are all deferred for over a second.
+- The class-level doc comment acknowledges this limitation.
+- **Recommendation**: Implement a non-blocking state machine (e.g. track press phase
+  and target pin; advance on each `handle()` call when the elapsed time is met).
 
-### 2. HTML Form Variables - Poor Initialization
-**Severity: MEDIUM**
-- Global JavaScript variables initialized with hardcoded defaults
-- Location: html.h lines 271-280
-- Variables: `timeon = 6`, `timeoff = 18`
-- **Impact**: Shows wrong values before first state update
-- **Recommendation**: Initialize from server state on page load
+### 2. HTML Form Variables — Hardcoded Defaults
+**Severity: MEDIUM** | **Status: OPEN**
+- `timeon` and `timeoff` are initialised to compile-time constants `6` / `18`.
+- Location: html.h lines 453–454
+- The `/state` polling interval fires every 2 s, so incorrect defaults are shown
+  briefly on every page load before the first XHR response arrives.
+- **Recommendation**: Trigger one immediate `GET /state` call on `DOMContentLoaded`
+  (before starting the `setInterval`) so the display is seeded from server state
+  before the user sees the page.
 
-### 3. Inconsistent Type Usage
-**Severity: LOW**
-- InputManager uses `int` for pin numbers instead of `uint8_t`
-- Location: InputManager.h lines 17-18
-- **Recommendation**: Use `uint8_t` for consistency with other managers
+### 3. InputManager — Mixed int / uint8_t State Types
+**Severity: LOW** | **Status: OPEN**
+- Pin members correctly use `uint8_t`, but the logical state variables
+  (`_ledState`, `_buttonState`, `_lastButtonState`, `_currentRelaxStatus`) are
+  declared as `int`.
+- Location: InputManager.h lines 30–33
+- **Recommendation**: Use `uint8_t` (or `bool` for LED/button state) for consistency
+  and a minor RAM saving.
 
-### 4. Millis() Overflow Not Handled
-**Severity: LOW**
-- All timing comparisons use `(millis() - last) > interval` pattern
-- This handles overflow correctly ✓
-- No issues found
+### 4. Millis() Overflow Handling
+**Severity: LOW** | **Status: NO ISSUE**
+- All timing comparisons use `(millis() - last) >= interval` pattern, which handles
+  the 49-day rollover correctly. ✓
 
 ### 5. Serial Print Statements
-**Severity: LOW**
-- Heavy use of Serial.print() throughout codebase
-- **Impact**: Small performance impact, increases code size
-- **Recommendation**: Consider compile-time flag to disable in production
+**Severity: LOW** | **Status: OPEN**
+- Verbose `Serial.print()` calls throughout every manager.
+- **Impact**: Minor performance overhead and increased binary size in production
+  firmware.
+- **Recommendation**: Wrap with a compile-time `DEBUG` flag (e.g.
+  `#ifdef DEBUG … #endif`) so production builds can strip them.
 
 ## Potential Bugs
 
 ### 1. WiFi Reconnect Counter Not Reset
-**Status: FIXED** (in recent commits)
-- WiFi reconnect attempts now reset on successful connection
+**Status: FIXED** — `_reconnectAttempts` is reset to 0 inside `onGotIP()`.
 
-### 2. Buffer Overflow Risk
-**Status: FIXED** (using snprintf)
-- WebServerManager::handleState() now uses snprintf()
+### 2. Buffer Overflow Risk in handleState()
+**Status: FIXED** — `WebServerManager::handleState()` uses `snprintf()` throughout.
 
 ### 3. No Null Check Before Using _pumpController/_mqttManager
-**Status: FIXED**
-- ScheduleManager::checkAndExecute() now checks for nullptr
+**Status: FIXED** — `ScheduleManager::checkAndExecute()` guards with nullptr checks.
 
 ## Memory Usage
 
 ### Optimizations Applied
 - TimeManager: Reduced from 24 bytes to 9 bytes (uint8_t/uint16_t types)
 - ScheduleManager: Reduced from 8 bytes to 2 bytes (uint8_t types)
-- TemperatureSensor: Now uses placement new instead of heap allocation
+- TemperatureSensor: Uses placement new into aligned stack buffers (no heap
+  allocation for OneWire/DallasTemperature objects)
+- All dead code removed (~500 bytes flash estimated saving)
+- InputManager pin numbers changed to `uint8_t` (saves 4 bytes RAM)
 
 ### Remaining Opportunities
-- Remove unused functions (~500 bytes flash estimated)
-- InputManager pin types (save 4 bytes RAM)
+- InputManager state variables (`_ledState` etc.) still `int` — change to
+  `uint8_t`/`bool` to save ~4 bytes RAM
 
 ## Architectural Issues
 
 ### 1. PumpController Coupling
-**Severity: MEDIUM**
-- Tight coupling between button simulation and pump control
-- Hardware-specific delays mixed with control logic
-- **Recommendation**: Separate concerns into PumpHardware and PumpControl layers
+**Severity: MEDIUM** | **Status: OPEN**
+- Blocking hardware delays are embedded directly in the public speed-change API,
+  making callers responsible for timing context.
+- **Recommendation**: Separate the GPIO pulsing mechanism (`PumpHardware`) from the
+  higher-level speed-selection logic (`PumpControl`) so the state machine can live
+  in the control layer without touching hardware timing directly.
 
 ### 2. Global Variables in main.cpp
-**Severity: LOW**
-- All manager instances and config are globals
-- Standard pattern for Arduino, acceptable
+**Severity: LOW** | **Status: ACCEPTABLE**
+- All manager instances and config are file-scope globals.
+- Standard and idiomatic pattern for Arduino/ESP32 sketches; no change needed.
 
 ## Summary
 
 **Critical Issues**: 0
 **High Priority**: 1 (Blocking delays in PumpController)
-**Medium Priority**: 2 (HTML initialization, PumpController architecture)
-**Low Priority**: 8 (Dead code)
+**Medium Priority**: 2 (HTML initialisation, PumpController architecture)
+**Low Priority**: 3 (InputManager state types, Serial prints)
 
 **Recommendations Priority**:
-1. Refactor PumpController to use non-blocking delays
-2. Remove dead code to reduce maintenance burden
-3. Fix duplicate header guard in TemperatureSensor.h
-4. Consider exposing sensor connection status in web UI
+1. Refactor PumpController to use a non-blocking state machine
+2. Seed HTML page with one immediate `/state` fetch on load
+3. Add `DEBUG` compile flag to strip Serial output from production builds
+4. Tighten InputManager state variable types to `uint8_t`/`bool`
