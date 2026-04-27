@@ -4,6 +4,18 @@
 #include <WiFi.h>
 #include <Preferences.h>
 
+/**
+ * Manages the WiFi connection lifecycle: initial association, automatic
+ * reconnection with exponential backoff, and full device restart after
+ * repeated failures (with a persistent reset counter stored in NVS).
+ *
+ * Reconnect/restart decisions are made inside WiFi event callbacks (which
+ * run on the ESP-IDF WiFi task) by setting flags only — no WiFi API,
+ * delay(), NVS or ESP.restart() calls happen there. handle() must be
+ * called from loop() to act on those flags safely from the main task.
+ *
+ * The Preferences pointer passed to begin() must outlive this object.
+ */
 class WiFiManager
 {
 public:

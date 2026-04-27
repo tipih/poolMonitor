@@ -12,6 +12,17 @@ class TimeManager;
 class InputManager;
 class OTAManager;
 
+/**
+ * Hosts the device's HTTP control panel on port 80 using
+ * ESPAsyncWebServer. Serves the embedded HTML UI, exposes a JSON /state
+ * endpoint for polling, and accepts pump-control and schedule-update
+ * requests. All endpoints are protected by HTTP Basic auth.
+ *
+ * Construction takes the always-required collaborators by reference;
+ * setManagerReferences() supplies the optional ones. setManagerReferences()
+ * MUST be called before begin(), since handlers run on the async server
+ * task and would otherwise observe null pointers.
+ */
 class WebServerManager
 {
 public:

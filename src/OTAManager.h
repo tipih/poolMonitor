@@ -4,6 +4,14 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 
+/**
+ * Wraps ArduinoOTA to provide network firmware updates. Tracks an
+ * "update in progress" flag so the main loop can suspend non-essential
+ * work (pump control, MQTT, etc.) while a transfer is running, giving
+ * the OTA handler maximum CPU time and avoiding mid-flash aborts.
+ *
+ * handle() must be called as the first thing in loop().
+ */
 class OTAManager {
 public:
   // Constructor

@@ -6,6 +6,12 @@
 #include <DallasTemperature.h>
 #include <new>
 
+/**
+ * Reads pool water temperature from a Dallas DS18B20 1-Wire sensor.
+ * Owns the OneWire bus and DallasTemperature driver, applies a
+ * configurable calibration offset, and caches the most recent reading
+ * so getTemperature() is cheap to call frequently.
+ */
 class TemperatureSensor {
 public:
   // Constructor

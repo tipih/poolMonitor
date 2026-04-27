@@ -8,6 +8,15 @@
 class PumpController;
 class MQTTManager;
 
+/**
+ * Owns the daily pump schedule (on-hour and off-hour) and persists it
+ * to NVS via Preferences. checkAndExecute() is called periodically from
+ * the main loop with the current hour and, when the hour matches a
+ * boundary, drives PumpController to the appropriate speed and publishes
+ * the new state via MQTTManager.
+ *
+ * Defaults to 06:00 ON / 18:00 OFF and validates stored values on load.
+ */
 class ScheduleManager {
 public:
   // Constructor

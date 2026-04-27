@@ -66,6 +66,10 @@ const int daylightOffset_sec = 3600;
 signed int rssi = 0;
 unsigned long lastDallasRead = millis();
 
+// Preferences storage for WiFiManager — must outlive setup() because
+// WiFiManager retains a pointer for use on the reconnect/restart path.
+static Preferences wifiPreferences;
+
 //******************************************************************************
 // Publish all sensor data to MQTT
 void publishStatusToMQTT()
@@ -113,9 +117,8 @@ void setup()
   // Initialize temperature sensor
   temperatureSensor.begin(GPIO_ONE_WIRE, TEMP_CALIBRATION_OFFSET);
 
-  // Initialize WiFi Manager
-  Preferences preferences;
-  wifiManager.begin(ssid, password, &preferences);
+  // Initialize WiFi Manager (uses file-scope wifiPreferences for persistent lifetime)
+  wifiManager.begin(ssid, password, &wifiPreferences);
 
   // Initialize MQTT Manager
   mqttManager.begin(MQTT_HOST, MQTT_PORT, MQTT_CLIENT_ID, MQTT_TOPIC, MQTT_USER, MQTT_PASS);
@@ -130,14 +133,15 @@ void setup()
   // Initialize input manager (button and LED)
   inputManager.begin(GPIO_BUTTON, LED_BUILTIN, DEBOUNCE_DELAY, LED_BLINK_INTERVAL);
 
-  // Setup web server
-  webServerManager.begin(http_username, http_password);
-
   // Initialize OTA Manager
   otaManager.begin();
 
-  // Set web server manager references (after OTA manager is initialized)
+  // Set web server manager references BEFORE starting the server, so that
+  // async request handlers can never observe null dependency pointers.
   webServerManager.setManagerReferences(timeManager, inputManager, otaManager, &rssi);
+
+  // Setup web server (starts accepting requests; deps must already be set)
+  webServerManager.begin(http_username, http_password);
 
   // Initialize pump controller
   pumpController.begin(GPIO_HIGH_SPEED, GPIO_LOW_SPEED, GPIO_MED_SPEED, GPIO_STOP);
@@ -202,10 +206,14 @@ void loop()
      publishStatusToMQTT();
    }
 
-  // Check and execute pump schedule (every 500ms)
+  // Check and execute pump schedule (every 500ms).
+  // Gated on a successful NTP sync so we never act on the placeholder hour.
   if ((millis() - lastLoopDelay) >= PUMP_CHECK_INTERVAL)
   {
     lastLoopDelay = millis();
-    scheduleManager.checkAndExecute(timeManager.getHour());
+    if (timeManager.isTimeValid())
+    {
+      scheduleManager.checkAndExecute(timeManager.getHour());
+    }
   }
 }

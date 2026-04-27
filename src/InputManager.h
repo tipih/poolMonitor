@@ -3,6 +3,14 @@
 
 #include <Arduino.h>
 
+/**
+ * Handles the on-board user-interface peripherals: a debounced push
+ * button (whose latched state is exposed as the "pool relax status")
+ * and a status LED that blinks at a fixed interval as a heartbeat.
+ *
+ * update() must be called from loop() to service debouncing and the
+ * LED toggle; both are millis()-based and non-blocking.
+ */
 class InputManager
 {
 public:

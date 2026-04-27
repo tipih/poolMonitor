@@ -3,6 +3,16 @@
 
 #include <Arduino.h>
 
+/**
+ * Drives the pool pump's speed-selector inputs by emulating physical
+ * button presses on four GPIO lines (high / low / medium / stop). Each
+ * speed change first releases the other lines, then pulses the target
+ * line low for a short interval before returning it high.
+ *
+ * Note: the speed-change methods currently use blocking delay() calls
+ * (~1.3 s total) to honour the pump panel's input timing. Callers must
+ * tolerate this latency or schedule changes when blocking is acceptable.
+ */
 class PumpController {
 public:
   // Pump speed enumeration

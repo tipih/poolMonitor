@@ -4,6 +4,16 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
+/**
+ * Manages the MQTT client lifecycle and Home Assistant integration:
+ * non-blocking connect/reconnect with retry interval, topic subscription,
+ * publishing helpers (raw topic and base-topic-relative subtopic), and
+ * one-shot publication of Home Assistant MQTT discovery configs so the
+ * device's sensors appear automatically in HA.
+ *
+ * handle() must be called frequently from loop() to service the
+ * underlying PubSubClient and trigger reconnects when needed.
+ */
 class MQTTManager
 {
 public:

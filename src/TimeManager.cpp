@@ -2,7 +2,7 @@
 
 TimeManager::TimeManager()
     : _currentSec(1), _currentDay(1), _currentMd(1), _currentYr(1),
-      _currentHour(1), _currentMinute(1), _previousTime(0)
+      _currentHour(1), _currentMinute(1), _previousTime(0), _timeValid(false)
 {
 }
 
@@ -19,12 +19,16 @@ void TimeManager::update()
 
   if (millis() - _previousTime > 5000) // Update every 5 seconds
   {
-    if (!getLocalTime(&timeinfo))
+    // Use a short timeout (10 ms) so this call cannot block the main loop
+    // for the default 5 seconds when NTP has not yet synced.
+    if (!getLocalTime(&timeinfo, 10))
     {
       Serial.println("Failed to obtain time");
+      _previousTime = millis();
       return;
     }
     _previousTime = millis();
+    _timeValid = true;
 
     _currentHour = timeinfo.tm_hour;
     _currentMinute = timeinfo.tm_min;
