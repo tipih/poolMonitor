@@ -33,7 +33,7 @@ void WiFiManager::begin(const char *ssid, const char *password, Preferences *pre
   if (_preferences)
   {
     _preferences->begin("reset", false);
-    _resetCounter = _preferences->getLong("resetCounter", 0);
+    _resetCounter = _preferences->getULong("resetCounter", 0);
     _preferences->end();
     _staticResetCounter = &_resetCounter;
 
@@ -154,7 +154,7 @@ void WiFiManager::handle()
     {
       (*_staticResetCounter)++;
       _staticPrefs->begin("reset", false);
-      _staticPrefs->putLong("resetCounter", *_staticResetCounter);
+      _staticPrefs->putULong("resetCounter", *_staticResetCounter);
       _staticPrefs->end();
     }
 
