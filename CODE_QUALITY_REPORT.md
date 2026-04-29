@@ -21,15 +21,18 @@ All previously reported dead code has been removed. No new dead code found.
 ## Code Quality Issues
 
 ### 1. PumpController — Blocking Delays
-**Severity: HIGH** | **Status: OPEN**
+**Severity: HIGH** | **Status: ACCEPTED (won't-fix, by-design)**
 - Multiple `delay()` calls in every speed-change method.
 - Location: PumpController.cpp lines 31–33, 39–46, 51–58, 64–71, 78–85
 - Each speed change blocks ~1300 ms total (3 × 100 ms pin release + 2 × 500 ms pulse)
 - **Impact**: Blocks main loop during the call; OTA handling, MQTT `loop()`, watchdog
   resets, and schedule checks are all deferred for over a second.
 - The class-level doc comment acknowledges this limitation.
-- **Recommendation**: Implement a non-blocking state machine (e.g. track press phase
-  and target pin; advance on each `handle()` call when the elapsed time is met).
+- **Decision (accepted)**: The blocking timing is required by the panel's physical
+  button-press hardware contract. Speed changes are infrequent (schedule-driven,
+  not per-loop), and the 90 s watchdog has ~70× headroom over the worst-case
+  ~1.3 s blocking window. A non-blocking refactor was considered and rejected as
+  not worth the added state-machine complexity.
 
 ### 2. HTML Form Variables — Hardcoded Defaults
 **Severity: MEDIUM** | **Status: FIXED**
@@ -63,13 +66,13 @@ All previously reported dead code has been removed. No new dead code found.
 **Severity: LOW** | **Status: FIXED**
 - Verbose `Serial.print()` calls were unguarded throughout the managers.
 - **Resolution**: Added `src/Debug.h` with `DBG_PRINT/PRINTLN/PRINTF` macros
-  that compile to no-ops when `DEBUG` is undefined. Common build_flags now
-  define `-DDEBUG` so the default build keeps the same output. Chatty per-
-  event prints (HTTP request handlers, per-temperature reads, per-MQTT-
-  publish logs) are routed through `DBG_*`; boot/init/error prints are
-  intentionally left as `Serial.print*` so they remain visible regardless of
-  the flag. To silence per-event logs in a build, add `-UDEBUG` to that
-  environment's `build_flags` (commit `3af07cd`).
+  that compile to no-ops when `DEBUG` is undefined. `-DDEBUG` is set only in
+  the `[env:test]` build_flags, so chatty per-event prints (HTTP request
+  handlers, per-temperature reads, per-MQTT-publish logs) are stripped from
+  production firmware (~944 bytes of flash saved). Boot/init/error prints
+  are intentionally left as `Serial.print*` so they remain visible in both
+  environments. To temporarily enable verbose logs in production, add
+  `-DDEBUG` to that env's `build_flags` (commits `3af07cd`, `f766eb7`).
 
 ## Potential Bugs
 
@@ -77,7 +80,9 @@ All previously reported dead code has been removed. No new dead code found.
 **Status: FIXED** — `_reconnectAttempts` is reset to 0 inside `onGotIP()`.
 
 ### 2. Buffer Overflow Risk in handleState()
-**Status: FIXED** — `WebServerManager::handleState()` uses `snprintf()` throughout.
+**Status: FIXED** — `WebServerManager::handleState()` uses `snprintf()` throughout,
+and the response buffer was grown from 200 to 256 bytes (commit `eaaccb3`) to
+leave comfortable headroom over the ~175-byte worst-case payload.
 
 ### 3. No Null Check Before Using _pumpController/_mqttManager
 **Status: FIXED** — `ScheduleManager::checkAndExecute()` guards with nullptr checks.
@@ -104,12 +109,16 @@ _(none currently tracked)_
 ## Architectural Issues
 
 ### 1. PumpController Coupling
-**Severity: MEDIUM** | **Status: OPEN**
+**Severity: MEDIUM** | **Status: ACCEPTED (won't-fix)**
 - Blocking hardware delays are embedded directly in the public speed-change API,
   making callers responsible for timing context.
-- **Recommendation**: Separate the GPIO pulsing mechanism (`PumpHardware`) from the
-  higher-level speed-selection logic (`PumpControl`) so the state machine can live
-  in the control layer without touching hardware timing directly.
+- **Recommendation (deferred)**: Separate the GPIO pulsing mechanism
+  (`PumpHardware`) from the higher-level speed-selection logic (`PumpControl`)
+  so the state machine can live in the control layer without touching hardware
+  timing directly.
+- **Decision (accepted)**: Same root cause as the blocking-delays item above.
+  Splitting the class only pays off if the timing model itself becomes
+  non-blocking, and that change is intentionally not being made.
 
 ### 2. Global Variables in main.cpp
 **Severity: LOW** | **Status: ACCEPTABLE**
@@ -119,11 +128,16 @@ _(none currently tracked)_
 ## Summary
 
 **Critical Issues**: 0
-**High Priority**: 1 (Blocking delays in PumpController — accepted as by-design)
-**Medium Priority**: 1 (PumpController architecture)
-**Low Priority**: 0 (InputManager state types and Serial prints both fixed)
+**High Priority**: 0 open (1 accepted: PumpController blocking delays)
+**Medium Priority**: 0 open (1 accepted: PumpController architecture)
+**Low Priority**: 0 open
+
+**Accepted (won't-fix) items**:
+1. PumpController blocking delays — required by panel button-press hardware
+   timing; 90 s watchdog has ~70× headroom over the ~1.3 s worst case.
+2. PumpController coupling/architecture — same root cause; splitting the class
+   is only worthwhile if the timing model becomes non-blocking, which is not
+   planned.
 
 **Recommendations Priority**:
-1. Refactor PumpController to use a non-blocking state machine (deferred —
-   the blocking is required by the panel's button-press timing and the
-   compounding risk with HeatPumpManager polling is bounded)
+_(no open recommendations)_
