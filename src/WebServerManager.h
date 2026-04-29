@@ -11,6 +11,7 @@ class TemperatureSensor;
 class TimeManager;
 class InputManager;
 class OTAManager;
+class HeatPumpManager;
 
 /**
  * Hosts the device's HTTP control panel on port 80 using
@@ -29,7 +30,7 @@ public:
   WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp);
 
   void begin(const char *username, const char *password);
-  void setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, int *rssi);
+  void setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, HeatPumpManager &heatPumpMgr, int *rssi);
 
 private:
   AsyncWebServer _server;
@@ -45,6 +46,7 @@ private:
   TimeManager *_timeManager;
   InputManager *_inputManager;
   OTAManager *_otaManager;
+  HeatPumpManager *_heatPumpManager;
   int *_rssi;
 
   // Handler methods

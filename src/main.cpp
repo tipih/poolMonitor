@@ -174,7 +174,7 @@ void setup()
 
   // Set web server manager references BEFORE starting the server, so that
   // async request handlers can never observe null dependency pointers.
-  webServerManager.setManagerReferences(timeManager, inputManager, otaManager, &rssi);
+  webServerManager.setManagerReferences(timeManager, inputManager, otaManager, heatPumpManager, &rssi);
 
   // Setup web server (starts accepting requests; deps must already be set)
   webServerManager.begin(http_username, http_password);

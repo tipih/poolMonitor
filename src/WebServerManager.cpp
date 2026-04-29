@@ -6,13 +6,15 @@
 #include "TimeManager.h"
 #include "InputManager.h"
 #include "OTAManager.h"
+#include "HeatPumpManager.h"
 #include "Debug.h"
 #include "html.h"
 
 WebServerManager::WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp)
     : _server(80), _pumpController(pump), _mqttManager(mqtt), _scheduleManager(schedule), _tempSensor(temp),
       _httpUsername(nullptr), _httpPassword(nullptr),
-      _timeManager(nullptr), _inputManager(nullptr), _otaManager(nullptr), _rssi(nullptr)
+      _timeManager(nullptr), _inputManager(nullptr), _otaManager(nullptr),
+      _heatPumpManager(nullptr), _rssi(nullptr)
 {
 }
 
@@ -50,11 +52,12 @@ void WebServerManager::begin(const char *username, const char *password)
   Serial.println("Web server started on port 80");
 }
 
-void WebServerManager::setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, int *rssi)
+void WebServerManager::setManagerReferences(TimeManager &timeMgr, InputManager &inputMgr, OTAManager &otaMgr, HeatPumpManager &heatPumpMgr, int *rssi)
 {
   _timeManager = &timeMgr;
   _inputManager = &inputMgr;
   _otaManager = &otaMgr;
+  _heatPumpManager = &heatPumpMgr;
   _rssi = rssi;
 }
 
@@ -184,20 +187,61 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
     return;
   }
 
-  char buffer[256];
-  snprintf(buffer, sizeof(buffer), "{\"poolRelaxStatus\":\"%u\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\",\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\",\"currentTemp\":\"%.2f\"}",
-          _inputManager->getRelaxStatus(),
-          _pumpController.getCurrentSpeed(),
-          _scheduleManager.getOnHour(),
-          _scheduleManager.getOffHour(),
-          *_rssi,
-          _timeManager->getHour(),
-          _timeManager->getMinute(),
-          _timeManager->getSecond(),
-          _timeManager->getDay(),
-          _timeManager->getMonth(),
-          _timeManager->getYear(),
-          _tempSensor.getTemperature());
+  // Heat pump fields. Only include real values once we've had at least
+  // one successful Modbus poll; otherwise emit hpOnline:0 with empty
+  // strings so the dashboard can render "--" placeholders.
+  bool hpHasData = _heatPumpManager && _heatPumpManager->getLastUpdate() != 0;
+  bool hpOnline = _heatPumpManager && _heatPumpManager->isOnline();
+
+  char buffer[384];
+  if (hpHasData)
+  {
+    snprintf(buffer, sizeof(buffer),
+             "{\"poolRelaxStatus\":\"%u\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\","
+             "\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\","
+             "\"currentTemp\":\"%.2f\","
+             "\"hpOnline\":\"%u\",\"hpPower\":\"%u\",\"hpInlet\":\"%.1f\",\"hpOutlet\":\"%.1f\","
+             "\"hpAmbient\":\"%.1f\",\"hpTarget\":\"%.1f\",\"hpMode\":\"%u\",\"hpError\":\"%u\"}",
+             _inputManager->getRelaxStatus(),
+             _pumpController.getCurrentSpeed(),
+             _scheduleManager.getOnHour(),
+             _scheduleManager.getOffHour(),
+             *_rssi,
+             _timeManager->getHour(),
+             _timeManager->getMinute(),
+             _timeManager->getSecond(),
+             _timeManager->getDay(),
+             _timeManager->getMonth(),
+             _timeManager->getYear(),
+             _tempSensor.getTemperature(),
+             hpOnline ? 1u : 0u,
+             _heatPumpManager->isPowerOn() ? 1u : 0u,
+             _heatPumpManager->getInletTempC(),
+             _heatPumpManager->getOutletTempC(),
+             _heatPumpManager->getAmbientTempC(),
+             _heatPumpManager->getTargetTempC(),
+             (unsigned)_heatPumpManager->getOperationMode(),
+             _heatPumpManager->getErrorCode());
+  }
+  else
+  {
+    snprintf(buffer, sizeof(buffer),
+             "{\"poolRelaxStatus\":\"%u\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\","
+             "\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\","
+             "\"currentTemp\":\"%.2f\",\"hpOnline\":\"0\"}",
+             _inputManager->getRelaxStatus(),
+             _pumpController.getCurrentSpeed(),
+             _scheduleManager.getOnHour(),
+             _scheduleManager.getOffHour(),
+             *_rssi,
+             _timeManager->getHour(),
+             _timeManager->getMinute(),
+             _timeManager->getSecond(),
+             _timeManager->getDay(),
+             _timeManager->getMonth(),
+             _timeManager->getYear(),
+             _tempSensor.getTemperature());
+  }
 
   request->send(200, "application/json", buffer);
 }

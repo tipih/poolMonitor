@@ -389,6 +389,22 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
 
       <div class="card">
+        <h2>🔥 Heat Pump</h2>
+        <div style="text-align: center; margin-bottom: 12px;">
+          <span class="status-badge status-error" id="hpStatus">Offline</span>
+        </div>
+        <div class="time-settings">
+          <div class="time-row"><label>Power</label><span id="hpPower">--</span></div>
+          <div class="time-row"><label>Mode</label><span id="hpMode">--</span></div>
+          <div class="time-row"><label>Target</label><span id="hpTarget">--</span></div>
+          <div class="time-row"><label>Inlet</label><span id="hpInlet">--</span></div>
+          <div class="time-row"><label>Outlet</label><span id="hpOutlet">--</span></div>
+          <div class="time-row"><label>Ambient</label><span id="hpAmbient">--</span></div>
+          <div class="time-row"><label>Error code</label><span id="hpError">--</span></div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>⏰ Schedule Settings</h2>
         <div class="time-settings">
           <div class="time-row">
@@ -590,6 +606,32 @@ if (pumpSpeed==0)
  
     document.getElementById("rssi").textContent = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + md + "." + yy;
     document.getElementById("status_temp").textContent = "🌡️ " + temperatur + "°C";
+
+    // Heat pump panel
+    var hpStatusEl = document.getElementById("hpStatus");
+    if (obj.hpOnline == 1) {
+      hpStatusEl.textContent = "Online";
+      hpStatusEl.className = "status-badge status-ok";
+      document.getElementById("hpPower").textContent = (obj.hpPower == 1) ? "On" : "Off";
+      var modeNames = ["Auto", "Heat", "Cool"];
+      var modeIdx = parseInt(obj.hpMode);
+      document.getElementById("hpMode").textContent = modeNames[modeIdx] || ("Mode " + obj.hpMode);
+      document.getElementById("hpTarget").textContent = obj.hpTarget + "°C";
+      document.getElementById("hpInlet").textContent = obj.hpInlet + "°C";
+      document.getElementById("hpOutlet").textContent = obj.hpOutlet + "°C";
+      document.getElementById("hpAmbient").textContent = obj.hpAmbient + "°C";
+      document.getElementById("hpError").textContent = obj.hpError;
+    } else {
+      hpStatusEl.textContent = "Offline";
+      hpStatusEl.className = "status-badge status-error";
+      document.getElementById("hpPower").textContent = "--";
+      document.getElementById("hpMode").textContent = "--";
+      document.getElementById("hpTarget").textContent = "--";
+      document.getElementById("hpInlet").textContent = "--";
+      document.getElementById("hpOutlet").textContent = "--";
+      document.getElementById("hpAmbient").textContent = "--";
+      document.getElementById("hpError").textContent = "--";
+    }
 
   }
  };
