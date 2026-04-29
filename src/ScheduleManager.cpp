@@ -71,7 +71,10 @@ void ScheduleManager::saveToNVM() {
 }
 
 bool ScheduleManager::isValidSchedule(uint8_t onHour, uint8_t offHour) const {
-  return (onHour < 24 && offHour < 24);
+  // Hours must be in 0..23 and onHour must differ from offHour. If they
+  // were equal, checkAndExecute() would fire both branches in the same
+  // hour and the pump would bounce between MED and LOW every tick.
+  return (onHour < 24 && offHour < 24 && onHour != offHour);
 }
 
 void ScheduleManager::checkAndExecute(uint8_t currentHour) {
