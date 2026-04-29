@@ -32,23 +32,27 @@ All previously reported dead code has been removed. No new dead code found.
   and target pin; advance on each `handle()` call when the elapsed time is met).
 
 ### 2. HTML Form Variables — Hardcoded Defaults
-**Severity: MEDIUM** | **Status: OPEN**
-- `timeon` and `timeoff` are initialised to compile-time constants `6` / `18`.
+**Severity: MEDIUM** | **Status: FIXED**
+- `timeon` and `timeoff` are initialised to compile-time constants `6` / `18`,
+  so the page briefly showed those values on every load before the first
+  poll response arrived.
 - Location: html.h lines 453–454
-- The `/state` polling interval fires every 2 s, so incorrect defaults are shown
-  briefly on every page load before the first XHR response arrives.
-- **Recommendation**: Trigger one immediate `GET /state` call on `DOMContentLoaded`
-  (before starting the `setInterval`) so the display is seeded from server state
-  before the user sees the page.
+- **Resolution**: The polling body was extracted into a named `refreshState()`
+  function; the script now calls it once immediately and only then schedules
+  `setInterval(refreshState, 2000)`. The dashboard renders real values within
+  one HTTP round-trip instead of waiting for the first interval tick (commit
+  `c5e142b`).
 
 ### 3. InputManager — Mixed int / uint8_t State Types
-**Severity: LOW** | **Status: OPEN**
-- Pin members correctly use `uint8_t`, but the logical state variables
-  (`_ledState`, `_buttonState`, `_lastButtonState`, `_currentRelaxStatus`) are
+**Severity: LOW** | **Status: FIXED**
+- Pin members already used `uint8_t`; the logical state variables
+  (`_ledState`, `_buttonState`, `_lastButtonState`, `_currentRelaxStatus`) were
   declared as `int`.
 - Location: InputManager.h lines 30–33
-- **Recommendation**: Use `uint8_t` (or `bool` for LED/button state) for consistency
-  and a minor RAM saving.
+- **Resolution**: `_ledState` is now `bool`; the remaining three are `uint8_t`,
+  and `getRelaxStatus()` returns `uint8_t`. Callers in `main.cpp` and
+  `WebServerManager.cpp` updated to use `%u` format specifiers (commit
+  `b5a135d`).
 
 ### 4. Millis() Overflow Handling
 **Severity: LOW** | **Status: NO ISSUE**
@@ -56,12 +60,16 @@ All previously reported dead code has been removed. No new dead code found.
   the 49-day rollover correctly. ✓
 
 ### 5. Serial Print Statements
-**Severity: LOW** | **Status: OPEN**
-- Verbose `Serial.print()` calls throughout every manager.
-- **Impact**: Minor performance overhead and increased binary size in production
-  firmware.
-- **Recommendation**: Wrap with a compile-time `DEBUG` flag (e.g.
-  `#ifdef DEBUG … #endif`) so production builds can strip them.
+**Severity: LOW** | **Status: FIXED**
+- Verbose `Serial.print()` calls were unguarded throughout the managers.
+- **Resolution**: Added `src/Debug.h` with `DBG_PRINT/PRINTLN/PRINTF` macros
+  that compile to no-ops when `DEBUG` is undefined. Common build_flags now
+  define `-DDEBUG` so the default build keeps the same output. Chatty per-
+  event prints (HTTP request handlers, per-temperature reads, per-MQTT-
+  publish logs) are routed through `DBG_*`; boot/init/error prints are
+  intentionally left as `Serial.print*` so they remain visible regardless of
+  the flag. To silence per-event logs in a build, add `-UDEBUG` to that
+  environment's `build_flags` (commit `3af07cd`).
 
 ## Potential Bugs
 
@@ -111,12 +119,11 @@ _(none currently tracked)_
 ## Summary
 
 **Critical Issues**: 0
-**High Priority**: 1 (Blocking delays in PumpController)
-**Medium Priority**: 2 (HTML initialisation, PumpController architecture)
-**Low Priority**: 3 (InputManager state types, Serial prints)
+**High Priority**: 1 (Blocking delays in PumpController — accepted as by-design)
+**Medium Priority**: 1 (PumpController architecture)
+**Low Priority**: 0 (InputManager state types and Serial prints both fixed)
 
 **Recommendations Priority**:
-1. Refactor PumpController to use a non-blocking state machine
-2. Seed HTML page with one immediate `/state` fetch on load
-3. Add `DEBUG` compile flag to strip Serial output from production builds
-4. Tighten InputManager state variable types to `uint8_t`/`bool`
+1. Refactor PumpController to use a non-blocking state machine (deferred —
+   the blocking is required by the panel's button-press timing and the
+   compounding risk with HeatPumpManager polling is bounded)
