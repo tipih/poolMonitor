@@ -12,6 +12,7 @@
 #include "WebServerManager.h"
 #include "TimeManager.h"
 #include "InputManager.h"
+#include "HeatPumpManager.h"
 
 #define WDT_TIMEOUT 90
 
@@ -36,6 +37,13 @@
 #define GPIO_BUTTON 13
 #define GPIO_ONE_WIRE 4
 
+// RS485 / Modbus pins for heat pump (MAX485 transceiver on UART2)
+#define GPIO_RS485_RX 16
+#define GPIO_RS485_TX 17
+#define GPIO_RS485_DE 18
+#define GPIO_RS485_RE 19
+#define HEATPUMP_SLAVE_ID 1
+
 // Timing Constants
 #define TEMP_READ_INTERVAL 10000     // Temperature reading interval (ms)
 #define TEMP_CALIBRATION_OFFSET 1.5  // Temperature calibration offset
@@ -53,6 +61,7 @@ OTAManager otaManager;
 WebServerManager webServerManager(pumpController, mqttManager, scheduleManager, temperatureSensor);
 TimeManager timeManager;
 InputManager inputManager;
+HeatPumpManager heatPumpManager;
 
 const char *ssid = SS_ID;
 const char *password = auth;
@@ -99,6 +108,27 @@ void publishStatusToMQTT()
   char ipPayload[16];
   snprintf(ipPayload, sizeof(ipPayload), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   mqttManager.publishToSubtopic("ip", ipPayload);
+
+  // Publish heat pump telemetry (only if a successful poll has happened).
+  if (heatPumpManager.getLastUpdate() != 0) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.1f", heatPumpManager.getInletTempC());
+    mqttManager.publishToSubtopic("heatpump/inlet_temp", buf);
+    snprintf(buf, sizeof(buf), "%.1f", heatPumpManager.getOutletTempC());
+    mqttManager.publishToSubtopic("heatpump/outlet_temp", buf);
+    snprintf(buf, sizeof(buf), "%.1f", heatPumpManager.getAmbientTempC());
+    mqttManager.publishToSubtopic("heatpump/ambient_temp", buf);
+    snprintf(buf, sizeof(buf), "%.1f", heatPumpManager.getTargetTempC());
+    mqttManager.publishToSubtopic("heatpump/target_temp", buf);
+    snprintf(buf, sizeof(buf), "%u", heatPumpManager.getErrorCode());
+    mqttManager.publishToSubtopic("heatpump/error", buf);
+    mqttManager.publishToSubtopic("heatpump/power", heatPumpManager.isPowerOn() ? "ON" : "OFF");
+    snprintf(buf, sizeof(buf), "%u", (unsigned)heatPumpManager.getOperationMode());
+    mqttManager.publishToSubtopic("heatpump/mode", buf);
+    snprintf(buf, sizeof(buf), "%u", (unsigned)heatPumpManager.getSilenceMode());
+    mqttManager.publishToSubtopic("heatpump/silence", buf);
+    mqttManager.publishToSubtopic("heatpump/online", heatPumpManager.isOnline() ? "1" : "0");
+  }
 }
 //*****************************************************************************/
 
@@ -148,6 +178,11 @@ void setup()
 
   // Initialize schedule manager with dependencies and load from NVM
   scheduleManager.begin(pumpController, mqttManager);
+
+  // Initialize heat pump Modbus link (UART2 + MAX485).
+  heatPumpManager.begin(GPIO_RS485_RX, GPIO_RS485_TX,
+                        GPIO_RS485_DE, GPIO_RS485_RE,
+                        HEATPUMP_SLAVE_ID);
 
   Serial.println("Setup complete!");
 }
@@ -205,6 +240,9 @@ void loop()
      // Publish all status data to MQTT
      publishStatusToMQTT();
    }
+
+  // Service the heat pump Modbus link. The manager rate-limits itself.
+  heatPumpManager.poll();
 
   // Check and execute pump schedule (every 500ms).
   // Gated on a successful NTP sync so we never act on the placeholder hour.

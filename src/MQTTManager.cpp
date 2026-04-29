@@ -202,5 +202,96 @@ void MQTTManager::publishHADiscovery()
            _baseTopic, haId, deviceJson);
   _mqttClient.publish(topic, payload, true);
 
+  // -------- Heat pump (read-only) --------
+  // All entities are sensors / binary_sensors only — no command topics are
+  // advertised, so HA will not offer any controls for these.
+
+  // Inlet water temperature
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_inlet_temp/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Inlet Temperature\",\"state_topic\":\"%s/heatpump/inlet_temp\","
+           "\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\","
+           "\"state_class\":\"measurement\",\"value_template\":\"{{ value }}\","
+           "\"unique_id\":\"%s_hp_inlet_temp\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Outlet water temperature
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_outlet_temp/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Outlet Temperature\",\"state_topic\":\"%s/heatpump/outlet_temp\","
+           "\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\","
+           "\"state_class\":\"measurement\",\"value_template\":\"{{ value }}\","
+           "\"unique_id\":\"%s_hp_outlet_temp\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Ambient temperature
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_ambient_temp/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Ambient Temperature\",\"state_topic\":\"%s/heatpump/ambient_temp\","
+           "\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\","
+           "\"state_class\":\"measurement\",\"value_template\":\"{{ value }}\","
+           "\"unique_id\":\"%s_hp_ambient_temp\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Target water temperature (read-only sensor, NOT a number entity)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_target_temp/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Target Temperature\",\"state_topic\":\"%s/heatpump/target_temp\","
+           "\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\","
+           "\"state_class\":\"measurement\",\"value_template\":\"{{ value }}\","
+           "\"unique_id\":\"%s_hp_target_temp\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Power state (binary_sensor, read-only — not a switch)
+  snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_hp_power/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Power\",\"state_topic\":\"%s/heatpump/power\","
+           "\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device_class\":\"power\","
+           "\"unique_id\":\"%s_hp_power\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Operation mode (read-only sensor; map enum -> label in HA)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_mode/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Mode\",\"state_topic\":\"%s/heatpump/mode\","
+           "\"value_template\":\"{%% set m={'0':'Auto','1':'Heat','2':'Cool'} %%}"
+           "{{ m.get(value, value) }}\","
+           "\"unique_id\":\"%s_hp_mode\",\"icon\":\"mdi:thermostat\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Silence / working mode (read-only sensor)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_silence/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Silence Mode\",\"state_topic\":\"%s/heatpump/silence\","
+           "\"value_template\":\"{%% set m={'0':'Smart','1':'Silence','2':'Super Silence'} %%}"
+           "{{ m.get(value, value) }}\","
+           "\"unique_id\":\"%s_hp_silence\",\"icon\":\"mdi:volume-low\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Error code (numeric sensor; E3 = no flow, etc.)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_error/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Error Code\",\"state_topic\":\"%s/heatpump/error\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_error\","
+           "\"icon\":\"mdi:alert-circle-outline\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Modbus link health (binary_sensor, problem class — on when offline)
+  snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_hp_online/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Modbus\",\"state_topic\":\"%s/heatpump/online\","
+           "\"payload_on\":\"0\",\"payload_off\":\"1\",\"device_class\":\"problem\","
+           "\"unique_id\":\"%s_hp_online\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
   Serial.println("Home Assistant discovery configs published");
 }
