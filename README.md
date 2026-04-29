@@ -1,12 +1,13 @@
 # Pool Monitor
 
-ESP32-based pool pump monitoring and control system with modern web interface, temperature sensing, MQTT integration, and Home Assistant auto-discovery.
+ESP32-based pool pump and heat pump monitoring & control system with a modern web interface, Dallas temperature sensing, Modbus RTU heat pump readout, MQTT integration, and Home Assistant auto-discovery.
 
 ## ✨ Features
 
 ### Core Functionality
 - **🎮 Remote Pool Pump Control**: Control pump speed (Low/Med/High/Stop) via web interface or MQTT
 - **🌡️ Temperature Monitoring**: Real-time pool water temperature using Dallas DS18B20 sensor
+- **♨️ Heat Pump Read-Out**: Modbus RTU (RS485) integration for Welldana PMH / Fairland IPHCR family — inlet/outlet/ambient temperature, target temperature, operation & silence mode, power and error code (read-only; see [HEATPUMP.md](HEATPUMP.md))
 - **📱 Modern Web Interface**: Responsive dashboard with 5 color themes and animated pool water effects
 - **🏠 Home Assistant Integration**: Automatic MQTT discovery for seamless smart home integration
 - **⏰ Scheduled Operation**: Configure automatic on/off times with persistent storage
@@ -22,7 +23,7 @@ ESP32-based pool pump monitoring and control system with modern web interface, t
 - **⚡ Instant Updates**: AJAX-based interface with smooth transitions
 
 ### Code Quality
-- **🏗️ Modular Architecture**: 9 manager classes for maintainability
+- **🏗️ Modular Architecture**: 10 manager classes for maintainability
 - **🛡️ OTA Protection**: Prevents pump operations during firmware updates
 - **🐛 Bug-Free**: Fixed buffer overflows, WiFi event issues, memory leaks
 - **📉 Optimized**: ~540 bytes flash saved, ~34 bytes RAM saved through type optimization
@@ -34,19 +35,26 @@ ESP32-based pool pump monitoring and control system with modern web interface, t
 - **Dallas DS18B20** temperature sensor (one-wire)
 - **Relay Module** or transistor circuit to interface with pool pump control buttons
 - **4.7kΩ resistor** (pull-up for DS18B20)
+- **MAX485 (or compatible) RS485 transceiver** for the heat pump Modbus link
 - **Push button** (optional, for manual input/testing)
 
 ### 📍 Pin Configuration
 
 | GPIO | Function | Description |
 |------|----------|-------------|
-| **4** | DS18B20 Data | Temperature sensor (one-wire) |
+| **4** | DS18B20 Data | Pool temperature sensor (one-wire) |
 | **13** | Button Input | Manual control button (active HIGH) |
 | **14** | Medium Speed | Pool pump medium speed control |
+| **16** | UART2 RX | MAX485 `RO` (heat pump Modbus) |
+| **17** | UART2 TX | MAX485 `DI` (heat pump Modbus) |
+| **18** | RS485 DE | MAX485 driver enable (active high) |
+| **19** | RS485 !RE | MAX485 receiver enable (active low) |
 | **25** | Stop | Pool pump stop control |
 | **26** | Low Speed | Pool pump low speed control |
 | **27** | High Speed | Pool pump high speed control |
 | **LED_BUILTIN** | Status LED | Connection status indicator |
+
+> If your MAX485 module ties `DE` and `!RE` together, wire that single pin to GPIO 18 and pass `18` for both `dePin` and `rePin` in `HeatPumpManager::begin(...)`. Modbus defaults: 9600 8N1, slave ID 1.
 
 ## 📦 Software Requirements
 
@@ -60,6 +68,7 @@ Built with PlatformIO using the Arduino framework.
 - ESPAsyncWebServer-esphome @ ^2.1.0  # Async web server
 - DallasTemperature @ ^3.10.0   # DS18B20 sensor library
 - OneWire @ ^2.3.8              # One-wire protocol
+- 4-20ma/ModbusMaster @ ^2.0.1  # Modbus RTU client (heat pump)
 - Preferences @ 2.0.0           # NVS storage
 - WiFi @ 2.0.0                  # WiFi connectivity
 - ArduinoOTA @ 2.0.0            # OTA updates
@@ -164,19 +173,40 @@ The device automatically publishes MQTT discovery messages for Home Assistant:
 - `binary_sensor.poolmonitor_status` - Pool system status
 - `sensor.poolmonitor_ip` - Device IP address
 
-All entities appear automatically under the "PoolMonitor" device in Home Assistant.
+**Heat pump (read-only):**
+- `sensor.poolmonitor_hp_inlet_temp` / `_hp_outlet_temp` / `_hp_ambient_temp` - Heat pump temperatures
+- `sensor.poolmonitor_hp_target_temp` - Configured target temperature
+- `binary_sensor.poolmonitor_hp_power` - Heat pump on/off state
+- `sensor.poolmonitor_hp_mode` - Operation mode (Auto / Heat / Cool)
+- `sensor.poolmonitor_hp_silence` - Silence mode (Smart / Silence / Super Silence)
+- `sensor.poolmonitor_hp_error` - Heat pump error code
+- `binary_sensor.poolmonitor_hp_online` - Modbus link health (problem class)
+
+All entities appear automatically under the "PoolMonitor" device in Home Assistant. Heat pump control entities (switch / number / select) are intentionally **not** advertised — the integration is read-only at this stage.
 
 ### 📡 MQTT Topics
 
-**Published topics:**
+**Published topics (pool):**
 - `pool/monitor/temperature` - Temperature in °C
 - `pool/monitor/rssi` - WiFi signal strength (dBm) 
 - `pool/monitor/pump_speed` - Current speed (Low/Med/High/Stop)
 - `pool/monitor/status` - System status (1=OK, 0=Error)
 - `pool/monitor/ip` - Device IP address
 
+**Published topics (heat pump):**
+- `pool/monitor/heatpump/inlet_temp` - Inlet water temperature (°C)
+- `pool/monitor/heatpump/outlet_temp` - Outlet water temperature (°C)
+- `pool/monitor/heatpump/ambient_temp` - Ambient air temperature (°C)
+- `pool/monitor/heatpump/target_temp` - Target water temperature (°C)
+- `pool/monitor/heatpump/power` - `ON` / `OFF`
+- `pool/monitor/heatpump/mode` - `0`=Auto, `1`=Heat, `2`=Cool
+- `pool/monitor/heatpump/silence` - `0`=Smart, `1`=Silence, `2`=Super Silence
+- `pool/monitor/heatpump/error` - Error code (numeric)
+- `pool/monitor/heatpump/online` - Modbus link health (`1` / `0`)
+
 **Home Assistant Discovery:**
 - `homeassistant/sensor/poolmonitor_*` - Auto-discovery configs
+- `homeassistant/binary_sensor/poolmonitor_*` - Auto-discovery configs
 
 ### 🔄 OTA Updates
 
@@ -214,7 +244,8 @@ src/
 ├── TemperatureSensor.*   # DS18B20 temperature reading
 ├── TimeManager.*         # NTP time synchronization  
 ├── WebServerManager.*    # HTTP server & routes
-└── InputManager.*        # Button input & LED status
+├── InputManager.*        # Button input & LED status
+└── HeatPumpManager.*     # Modbus RTU heat pump readout (RS485)
 ```
 
 **Benefits:**
@@ -275,7 +306,16 @@ Theme preference is saved in browser localStorage.
 
 ## 📝 Version History
 
-### v2.0.0 (Current) - Architecture Refactor & UI Overhaul
+### v2.1.0 (Current) - Heat Pump Integration
+- ✅ New `HeatPumpManager` reads Welldana / Fairland heat pump over RS485 (Modbus RTU)
+- ✅ Self-rate-limited polling (default 5 s); cached values exposed via getters
+- ✅ Heat pump telemetry published under `<base>/heatpump/*` every 10 s
+- ✅ 9 new Home Assistant auto-discovery entities (sensors + binary_sensors, read-only)
+- ✅ Added `4-20ma/ModbusMaster` dependency
+- ✅ Removed legacy broken `heatpumpRead.*` stub
+- ✅ Added [HEATPUMP.md](HEATPUMP.md) with wiring, register map and topic reference
+
+### v2.0.0 - Architecture Refactor & UI Overhaul
 - ✅ Complete architecture refactor to manager-based design
 - ✅ 5 color themes with animated pool water effects
 - ✅ OTA protection against blocking delays  
