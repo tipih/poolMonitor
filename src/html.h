@@ -478,20 +478,20 @@ const char index_html[] PROGMEM = R"rawliteral(
       
      if (x=="LowOff") 
     {
-      document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed LOW";
+      document.getElementById("poolPumpSpeed").textContent = "Pump Speed LOW";
     }
     else if(x=="HighOff") 
     {
-     document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed HIGH";   
+     document.getElementById("poolPumpSpeed").textContent = "Pump Speed HIGH";   
     }
      else if(x=="MedOff") 
     {
-     document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed Med";   
+     document.getElementById("poolPumpSpeed").textContent = "Pump Speed Med";   
     }
 
       else if(x=="StopOff") 
     {
-     document.getElementById("poolPumpSpeed").innerHTML = "Pump Stop";   
+     document.getElementById("poolPumpSpeed").textContent = "Pump Stop";   
     }
      
    }
@@ -520,16 +520,16 @@ const char index_html[] PROGMEM = R"rawliteral(
    
    function changeOnTime(x) {
    console.log(x);
-   document.getElementById("timeOn").innerHTML = x;
+   document.getElementById("timeOn").textContent = x;
    }
    
    function changeOffTime(x) {
    console.log(x);
-   document.getElementById("timeOff").innerHTML = x;
+   document.getElementById("timeOff").textContent = x;
    }
    
    
-   setInterval(function ( ) {
+   function refreshState() {
   console.log('Running interval');
 
   var xhttp = new XMLHttpRequest();
@@ -555,47 +555,52 @@ const char index_html[] PROGMEM = R"rawliteral(
 
 if (RelaxStatus==1) 
     {
-      document.getElementById("poolRelaxState").innerHTML = "OK";
+      document.getElementById("poolRelaxState").textContent = "OK";
       document.getElementById("poolRelaxState").className = "status-badge status-ok";
     }
     else if(RelaxStatus==0) 
     {
-      document.getElementById("poolRelaxState").innerHTML = "ERROR";
+      document.getElementById("poolRelaxState").textContent = "ERROR";
       document.getElementById("poolRelaxState").className = "status-badge status-error";
     }
 
 if (pumpSpeed==0) 
     {
-      document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed LOW";
+      document.getElementById("poolPumpSpeed").textContent = "Pump Speed LOW";
     }
     else if(pumpSpeed==1) 
     {
-     document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed HIGH";   
+     document.getElementById("poolPumpSpeed").textContent = "Pump Speed HIGH";   
     }
      else if(pumpSpeed==2) 
     {
-       document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed Not set"; 
+       document.getElementById("poolPumpSpeed").textContent = "Pump Speed Not set"; 
     }
      else if(pumpSpeed==3) 
     {
-       document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed Med"; 
+       document.getElementById("poolPumpSpeed").textContent = "Pump Speed Med"; 
     }
      else if(pumpSpeed==4) 
     {
-       document.getElementById("poolPumpSpeed").innerHTML = "Pump Speed Stop"; 
+       document.getElementById("poolPumpSpeed").textContent = "Pump Speed Stop"; 
     }
 
-    document.getElementById("timeOn").innerHTML = timeon + ":00";
-    document.getElementById("timeOff").innerHTML = timeoff + ":00"; 
+    document.getElementById("timeOn").textContent = timeon + ":00";
+    document.getElementById("timeOff").textContent = timeoff + ":00"; 
  
-    document.getElementById("rssi").innerHTML = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + md + "." + yy;
-    document.getElementById("status_temp").innerHTML = "🌡️ " + temperatur + "°C";
+    document.getElementById("rssi").textContent = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + md + "." + yy;
+    document.getElementById("status_temp").textContent = "🌡️ " + temperatur + "°C";
 
   }
  };
   xhttp.open("GET", "/state", true);
   xhttp.send();
-}, 2000 ) ;
+}
+
+// Fetch immediately on load (avoids 2 s flicker of placeholder values),
+// then poll every 2 s.
+refreshState();
+setInterval(refreshState, 2000);
 
 setInterval(function ( ) {
   if (server_running == true) {
