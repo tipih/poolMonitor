@@ -34,7 +34,9 @@ void TimeManager::update()
     _currentMinute = timeinfo.tm_min;
     _currentSec = timeinfo.tm_sec;
     _currentDay = timeinfo.tm_mday;
-    _currentMd = timeinfo.tm_mon;
+    // tm_mon is 0-based (0=Jan, 11=Dec); expose as the conventional
+    // 1-based month so callers and the web UI don't need to compensate.
+    _currentMd = timeinfo.tm_mon + 1;
     _currentYr = timeinfo.tm_year + 1900;
 
     // Disabled verbose time logging to reduce serial output and improve OTA responsiveness

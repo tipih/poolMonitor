@@ -588,7 +588,7 @@ if (pumpSpeed==0)
     document.getElementById("timeOn").innerHTML = timeon + ":00";
     document.getElementById("timeOff").innerHTML = timeoff + ":00"; 
  
-    document.getElementById("rssi").innerHTML = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + (parseInt(md)+1) + "." + yy;
+    document.getElementById("rssi").innerHTML = "📶 RSSI " + rssi + " | ⏰ " + hh + ":" + mm + ":" + ss + " " + dd + "." + md + "." + yy;
     document.getElementById("status_temp").innerHTML = "🌡️ " + temperatur + "°C";
 
   }
