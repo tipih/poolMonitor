@@ -1,6 +1,6 @@
 # Pool Monitor
 
-ESP32-based pool pump and heat pump monitoring & control system with a modern web interface, Dallas temperature sensing, Modbus RTU heat pump readout, MQTT integration, and Home Assistant auto-discovery.
+ESP32-based pool pump and heat pump monitoring & control system with a modern web interface, Dallas temperature sensing, Modbus RTU heat pump readout, MQTT integration, Home Assistant auto-discovery, and host-PC unit tests.
 
 ## ✨ Features
 
@@ -24,6 +24,8 @@ ESP32-based pool pump and heat pump monitoring & control system with a modern we
 
 ### Code Quality
 - **🏗️ Modular Architecture**: 10 manager classes for maintainability
+- **🧪 Host-PC Unit Tests**: Unity test suite (`pio test -e native`) covers `PumpController`, `ScheduleManager`, and `HeatPumpManager` pure logic
+- **🔇 DEBUG Stripped from Production**: `DBG_PRINT*` macros compile to no-ops in `[env:production]`; verbose serial logs only in `[env:test]`
 - **🛡️ OTA Protection**: Prevents pump operations during firmware updates
 - **🐛 Bug-Free**: Fixed buffer overflows, WiFi event issues, memory leaks
 - **📉 Optimized**: ~540 bytes flash saved, ~34 bytes RAM saved through type optimization
@@ -145,6 +147,27 @@ MQTT broker address is set in `src/main.cpp`:
    platformio device monitor
    ```
 
+## 🧪 Testing
+
+Host-PC unit tests run on your development machine via PlatformIO's
+Unity integration — no ESP32 hardware required.
+
+```bash
+platformio test -e native
+```
+
+Covered managers and behaviours:
+
+- **`PumpController`** — initial state, speed setters, `getSpeedString()` mapping
+- **`ScheduleManager`** — `isValidSchedule()` (range + equal-hour rejection), `setSchedule()` ignores invalid input, `checkAndExecute()` drives pump + MQTT on hour boundaries and is idempotent within an hour
+- **`HeatPumpManager`** — initial cached state, `resultToString()` for known and unknown Modbus codes, `poll()` no-op before `begin()`
+
+Requires a host C++ compiler on `PATH`. On the development host this is
+LLVM clang at `C:\Program Files\LLVM\bin`; the `[env:native]` PlatformIO
+env injects `scripts/shims/` (gcc/g++/ar/ranlib `.cmd` wrappers around
+clang) automatically. See [test/test_native/README.md](test/test_native/README.md) for layout and
+what is intentionally not covered (real GPIO/NVS/RS485/WiFi).
+
 ## 🌐 Usage
 
 ### Web Interface
@@ -236,6 +259,7 @@ src/
 ├── main.cpp              # Main setup and loop
 ├── cred.h                # Credentials (gitignored)
 ├── html.h                # Web interface HTML/CSS/JS
+├── Debug.h               # DBG_* macros (no-op when DEBUG undefined)
 ├── WiFiManager.*         # WiFi connection management
 ├── MQTTManager.*         # MQTT publishing & HA discovery
 ├── OTAManager.*          # OTA updates with protection
@@ -243,9 +267,19 @@ src/
 ├── ScheduleManager.*     # Automatic scheduling
 ├── TemperatureSensor.*   # DS18B20 temperature reading
 ├── TimeManager.*         # NTP time synchronization  
-├── WebServerManager.*    # HTTP server & routes
+├── WebServerManager.*    # HTTP server & routes (incl. heat pump tile)
 ├── InputManager.*        # Button input & LED status
 └── HeatPumpManager.*     # Modbus RTU heat pump readout (RS485)
+
+test/
+└── test_native/          # Host-PC Unity unit tests
+    ├── mocks/            # Arduino, Preferences, HardwareSerial,
+    │                     # ModbusMaster, MQTTManager mocks
+    └── test_main.cpp     # Test runner
+
+scripts/
+├── native_use_clang.py  # PlatformIO pre-script: PATH + -include for [env:native]
+└── shims/               # gcc/g++/ar/ranlib .cmd wrappers around clang
 ```
 
 **Benefits:**
@@ -306,7 +340,33 @@ Theme preference is saved in browser localStorage.
 
 ## 📝 Version History
 
-### v2.1.0 (Current) - Heat Pump Integration
+### v2.2.0 (Current) — Quality Pass & Tests
+- ✅ Heat pump status tile added to the web dashboard (`/state` JSON now
+  includes `hpOnline`, `hpPower`, `hpMode`, `hpTarget`, `hpInlet`,
+  `hpOutlet`, `hpAmbient`, `hpError`)
+- ✅ New `[env:native]` host-PC unit tests for `PumpController`,
+  `ScheduleManager`, `HeatPumpManager` (11 tests, run with
+  `pio test -e native`)
+- ✅ `src/Debug.h` with `DBG_PRINT/PRINTLN/PRINTF` macros; `-DDEBUG` is
+  now only set in `[env:test]`, so production firmware drops the chatty
+  per-event prints (~944 bytes flash saved)
+- ✅ `pump_status` MQTT topic actually published to back the existing HA
+  binary_sensor discovery
+- ✅ `WiFiManager.onGotIP()` reads IP from the event payload (no WiFi
+  API call inside the event task); reset counter migrated to
+  `putULong/getULong`
+- ✅ `HeatPumpManager` got a destructor and idempotent `begin()`
+- ✅ `TemperatureSensor` simplified from placement-new pattern to a
+  single one-time heap allocation
+- ✅ `InputManager` state types tightened (`bool` / `uint8_t`)
+- ✅ `ScheduleManager.isValidSchedule()` now rejects equal on/off hours
+- ✅ `WebServerManager.handleState()` JSON buffer grown 200 → 384 bytes
+  (heat pump fields fit; null guards return 503 if managers not wired)
+- ✅ `TimeManager` month off-by-one fixed (`tm_mon + 1`)
+- ✅ HTML uses `textContent` everywhere for server-driven DOM updates;
+  `refreshState()` runs once on load before the 2 s interval
+
+### v2.1.0 — Heat Pump Integration
 - ✅ New `HeatPumpManager` reads Welldana / Fairland heat pump over RS485 (Modbus RTU)
 - ✅ Self-rate-limited polling (default 5 s); cached values exposed via getters
 - ✅ Heat pump telemetry published under `<base>/heatpump/*` every 10 s

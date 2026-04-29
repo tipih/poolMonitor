@@ -141,3 +141,21 @@ _(none currently tracked)_
 
 **Recommendations Priority**:
 _(no open recommendations)_
+
+## Test Coverage
+
+Host-PC unit tests (`pio test -e native`) currently cover:
+
+- **PumpController** — initial `NO_SPEED`, speed setters update state,
+  `getSpeedString()` mapping for all five enum values.
+- **ScheduleManager** — `isValidSchedule()` for normal / out-of-range /
+  equal hours, `setSchedule()` rejects invalid input without mutating
+  state, `checkAndExecute()` drives the pump and publishes MQTT on hour
+  boundaries and is idempotent within an hour.
+- **HeatPumpManager** — initial offline / NaN / default state,
+  `resultToString()` for known and unknown Modbus codes, `poll()` no-op
+  before `begin()`.
+
+Intentionally not covered (no useful pure-logic surface): GPIO timing,
+NVS persistence across reboots, real Modbus traffic, WiFi / MQTT broker
+/ OTA / AsyncWebServer, TimeManager (SNTP), TemperatureSensor (OneWire).
