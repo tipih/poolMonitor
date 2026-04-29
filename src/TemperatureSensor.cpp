@@ -1,4 +1,5 @@
 #include "TemperatureSensor.h"
+#include "Debug.h"
 
 TemperatureSensor::TemperatureSensor()
   : _oneWire(nullptr),
@@ -56,11 +57,11 @@ float TemperatureSensor::readTemperature() {
     _currentTemp = tempC + _calibrationOffset;
     _lastReadTime = millis();
     
-    Serial.print("Temperature reading: ");
-    Serial.print(tempC);
-    Serial.print("°C (calibrated: ");
-    Serial.print(_currentTemp);
-    Serial.println("°C)");
+    DBG_PRINT("Temperature reading: ");
+    DBG_PRINT(tempC);
+    DBG_PRINT("°C (calibrated: ");
+    DBG_PRINT(_currentTemp);
+    DBG_PRINTLN("°C)");
     
     return _currentTemp;
   } else {

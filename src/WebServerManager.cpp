@@ -6,6 +6,7 @@
 #include "TimeManager.h"
 #include "InputManager.h"
 #include "OTAManager.h"
+#include "Debug.h"
 #include "html.h"
 
 WebServerManager::WebServerManager(PumpController &pump, MQTTManager &mqtt, ScheduleManager &schedule, TemperatureSensor &temp)
@@ -80,7 +81,7 @@ void WebServerManager::handleLoggedOut(AsyncWebServerRequest *request)
 // Handler for pump control updates
 void WebServerManager::handleUpdate(AsyncWebServerRequest *request)
 {
-  Serial.println("Got an update");
+  DBG_PRINTLN("Got an update");
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
 
@@ -96,8 +97,8 @@ void WebServerManager::handleUpdate(AsyncWebServerRequest *request)
     AsyncWebParameter *p = request->getParam(0);
     String value = p->value();
 
-    Serial.print("Button: ");
-    Serial.println(value);
+    DBG_PRINT("Button: ");
+    DBG_PRINTLN(value);
 
     if (value == "LowOff")
     {
@@ -127,7 +128,7 @@ void WebServerManager::handleUpdate(AsyncWebServerRequest *request)
 // Handler for time schedule adjustments
 void WebServerManager::handleTimeAdjust(AsyncWebServerRequest *request)
 {
-  Serial.println("Got a time update");
+  DBG_PRINTLN("Got a time update");
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
 
@@ -156,10 +157,10 @@ void WebServerManager::handleTimeAdjust(AsyncWebServerRequest *request)
   uint8_t onTime = (uint8_t)onLong;
   uint8_t offTime = (uint8_t)offLong;
 
-  Serial.print("New schedule: ON=");
-  Serial.print(onTime);
-  Serial.print(", OFF=");
-  Serial.println(offTime);
+  DBG_PRINT("New schedule: ON=");
+  DBG_PRINT(onTime);
+  DBG_PRINT(", OFF=");
+  DBG_PRINTLN(offTime);
 
   _scheduleManager.setSchedule(onTime, offTime);
 
@@ -169,7 +170,7 @@ void WebServerManager::handleTimeAdjust(AsyncWebServerRequest *request)
 // Handler for state polling
 void WebServerManager::handleState(AsyncWebServerRequest *request)
 {
-  Serial.println("Got a state request");
+  DBG_PRINTLN("Got a state request");
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
 

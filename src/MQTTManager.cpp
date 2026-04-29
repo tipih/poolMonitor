@@ -1,4 +1,5 @@
 #include "MQTTManager.h"
+#include "Debug.h"
 #include <Arduino.h>
 
 MQTTManager::MQTTManager() : _mqttClient(_espClient)
@@ -108,10 +109,10 @@ bool MQTTManager::publish(const char *topic, const char *payload, bool retain)
   {
     if (_mqttClient.publish(topic, payload, retain))
     {
-      Serial.print("Published to ");
-      Serial.print(topic);
-      Serial.print(": ");
-      Serial.println(payload);
+      DBG_PRINT("Published to ");
+      DBG_PRINT(topic);
+      DBG_PRINT(": ");
+      DBG_PRINTLN(payload);
       return true;
     }
   }
