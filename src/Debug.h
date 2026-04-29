@@ -7,11 +7,10 @@
  * Debug logging macros. Defined as Serial.print* when DEBUG is set,
  * compiled away to a no-op otherwise.
  *
- * `DEBUG` is set in platformio.ini's common build_flags so the default
- * behaviour matches the previous unconditional Serial.print* calls. To
- * silence the chatty per-event logs (HTTP requests, MQTT publishes,
- * per-temperature-reading prints, ...), add `-UDEBUG` to the build_flags
- * for that environment.
+ * `DEBUG` is defined only in the [env:test] build_flags in platformio.ini,
+ * so per-event logs are visible on the test device but stripped from
+ * production firmware. To temporarily enable them in production, add
+ * `-DDEBUG` to that environment's build_flags.
  *
  * Use these for high-frequency / per-event logs only. Boot, init and
  * error messages should keep using Serial.print* directly so they
