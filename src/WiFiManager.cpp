@@ -81,10 +81,13 @@ void WiFiManager::onStationConnected(WiFiEvent_t event, WiFiEventInfo_t info)
 
 void WiFiManager::onGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
 {
-  Serial.println("WiFi connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  
+  // Runs inside the ESP-IDF WiFi task — same constraints as
+  // onStationDisconnected: do NOT call into the WiFi API here. Read the
+  // IP straight from the event payload instead of WiFi.localIP().
+  IPAddress ip(info.got_ip.ip_info.ip.addr);
+  Serial.print("WiFi connected, IP address: ");
+  Serial.println(ip);
+
   // Reset reconnect state on successful connection
   _reconnectAttempts = 0;
   _reconnectAt = 0;
