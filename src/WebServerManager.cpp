@@ -154,6 +154,16 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
 
+  // Defensive null checks: handleState() depends on references wired in
+  // via setManagerReferences(). main.cpp guarantees that ordering, but
+  // returning 503 here is safer than dereferencing a stale/null pointer
+  // if a request races begin() or the wiring is ever changed.
+  if (!_timeManager || !_inputManager || !_rssi)
+  {
+    request->send(503, "text/plain", "State not ready");
+    return;
+  }
+
   char buffer[200];
   snprintf(buffer, sizeof(buffer), "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\",\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\",\"currentTemp\":\"%.2f\"}",
           _inputManager->getRelaxStatus(),
