@@ -131,18 +131,37 @@ void WebServerManager::handleTimeAdjust(AsyncWebServerRequest *request)
   if (!request->authenticate(_httpUsername, _httpPassword))
     return request->requestAuthentication();
 
-  if (request->params() > 1)
+  // Look up by name rather than positional index. Browsers preserve the
+  // query-string order today, but relying on that made the endpoint
+  // brittle (e.g. proxies or hand-crafted URLs could reorder params and
+  // silently swap the on/off hours).
+  AsyncWebParameter *onParam = request->getParam("onTime");
+  AsyncWebParameter *offParam = request->getParam("offTime");
+
+  if (!onParam || !offParam)
   {
-    uint8_t onTime = request->getParam(0)->value().toInt();
-    uint8_t offTime = request->getParam(1)->value().toInt();
-
-    Serial.print("New schedule: ON=");
-    Serial.print(onTime);
-    Serial.print(", OFF=");
-    Serial.println(offTime);
-
-    _scheduleManager.setSchedule(onTime, offTime);
+    request->send(400, "text/plain", "Missing onTime or offTime parameter");
+    return;
   }
+
+  long onLong = onParam->value().toInt();
+  long offLong = offParam->value().toInt();
+
+  if (onLong < 0 || onLong > 23 || offLong < 0 || offLong > 23)
+  {
+    request->send(400, "text/plain", "Hour out of range (0-23)");
+    return;
+  }
+
+  uint8_t onTime = (uint8_t)onLong;
+  uint8_t offTime = (uint8_t)offLong;
+
+  Serial.print("New schedule: ON=");
+  Serial.print(onTime);
+  Serial.print(", OFF=");
+  Serial.println(offTime);
+
+  _scheduleManager.setSchedule(onTime, offTime);
 
   request->send(200, "text/plain", "OK");
 }
