@@ -98,6 +98,12 @@ void publishStatusToMQTT()
   snprintf(speedPayload, sizeof(speedPayload), "%s", pumpController.getSpeedString());
   mqttManager.publishToSubtopic("pump_speed", speedPayload);
 
+  // Publish boolean "pump running" state for the HA binary_sensor that's
+  // advertised under pump_status. Anything other than STOP counts as on.
+  mqttManager.publishToSubtopic(
+      "pump_status",
+      pumpController.getCurrentSpeed() == PumpController::STOP ? "off" : "on");
+
   // Publish pool relax status (1 = ok, 0 = error)
   char statusPayload[8];
   snprintf(statusPayload, sizeof(statusPayload), "%u", inputManager.getRelaxStatus());
