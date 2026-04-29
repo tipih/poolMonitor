@@ -19,7 +19,7 @@ public:
   void begin(uint8_t buttonPin, uint8_t ledPin, unsigned long debounceDelay, unsigned long ledBlinkInterval);
   void update();
 
-  int getRelaxStatus() const { return _currentRelaxStatus; }
+  uint8_t getRelaxStatus() const { return _currentRelaxStatus; }
 
 private:
   uint8_t _buttonPin;
@@ -27,10 +27,10 @@ private:
   unsigned long _debounceDelay;
   unsigned long _ledBlinkInterval;
 
-  int _ledState;
-  int _buttonState;
-  int _lastButtonState;
-  int _currentRelaxStatus;
+  bool _ledState;            // current LED level (HIGH/LOW)
+  uint8_t _buttonState;      // last debounced raw read (HIGH/LOW)
+  uint8_t _lastButtonState;  // last raw read, used for debounce edge
+  uint8_t _currentRelaxStatus; // 0/1, mirrors _buttonState after debounce
 
   unsigned long _lastDebounceTime;
   unsigned long _lastLEDToggle;

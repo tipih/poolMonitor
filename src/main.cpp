@@ -100,7 +100,7 @@ void publishStatusToMQTT()
 
   // Publish pool relax status (1 = ok, 0 = error)
   char statusPayload[8];
-  snprintf(statusPayload, sizeof(statusPayload), "%d", inputManager.getRelaxStatus());
+  snprintf(statusPayload, sizeof(statusPayload), "%u", inputManager.getRelaxStatus());
   mqttManager.publishToSubtopic("status", statusPayload);
 
   // Publish IP address

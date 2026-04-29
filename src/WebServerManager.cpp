@@ -184,7 +184,7 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
   }
 
   char buffer[200];
-  snprintf(buffer, sizeof(buffer), "{\"poolRelaxStatus\":\"%d\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\",\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\",\"currentTemp\":\"%.2f\"}",
+  snprintf(buffer, sizeof(buffer), "{\"poolRelaxStatus\":\"%u\",\"pumpSpeed\":\"%d\",\"onTime\":\"%u\",\"offTime\":\"%u\",\"rssi\":\"%d\",\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\",\"currentTemp\":\"%.2f\"}",
           _inputManager->getRelaxStatus(),
           _pumpController.getCurrentSpeed(),
           _scheduleManager.getOnHour(),

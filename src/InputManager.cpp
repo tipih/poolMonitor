@@ -2,7 +2,7 @@
 
 InputManager::InputManager()
     : _buttonPin(0), _ledPin(0), _debounceDelay(50), _ledBlinkInterval(500),
-      _ledState(LOW), _buttonState(0), _lastButtonState(LOW), _currentRelaxStatus(0),
+      _ledState(false), _buttonState(LOW), _lastButtonState(LOW), _currentRelaxStatus(0),
       _lastDebounceTime(0), _lastLEDToggle(0)
 {
 }
@@ -23,7 +23,7 @@ void InputManager::begin(uint8_t buttonPin, uint8_t ledPin, unsigned long deboun
 void InputManager::update()
 {
   // Read button status
-  int data = digitalRead(_buttonPin);
+  uint8_t data = digitalRead(_buttonPin);
 
   if (data != _lastButtonState)
   {
@@ -45,7 +45,7 @@ void InputManager::update()
   {
     _lastLEDToggle = millis();
     _ledState = !_ledState;
-    digitalWrite(_ledPin, _ledState);
+    digitalWrite(_ledPin, _ledState ? HIGH : LOW);
   }
 
   _lastButtonState = data;
