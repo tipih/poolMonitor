@@ -79,14 +79,19 @@ All previously reported dead code has been removed. No new dead code found.
 ### Optimizations Applied
 - TimeManager: Reduced from 24 bytes to 9 bytes (uint8_t/uint16_t types)
 - ScheduleManager: Reduced from 8 bytes to 2 bytes (uint8_t types)
-- TemperatureSensor: Uses placement new into aligned stack buffers (no heap
-  allocation for OneWire/DallasTemperature objects)
+- TemperatureSensor: Heap-allocates `OneWire` and `DallasTemperature` once
+  in `begin()` (idempotent — second call is a no-op). The previous
+  placement-new-into-aligned-buffers pattern was removed as
+  over-engineered for an object that lives for the entire firmware
+  lifetime.
 - All dead code removed (~500 bytes flash estimated saving)
 - InputManager pin numbers changed to `uint8_t` (saves 4 bytes RAM)
+- InputManager state variables (`_ledState`, `_buttonState`,
+  `_lastButtonState`, `_currentRelaxStatus`) changed from `int` to
+  `bool` / `uint8_t`; `getRelaxStatus()` now returns `uint8_t`.
 
 ### Remaining Opportunities
-- InputManager state variables (`_ledState` etc.) still `int` — change to
-  `uint8_t`/`bool` to save ~4 bytes RAM
+_(none currently tracked)_
 
 ## Architectural Issues
 
