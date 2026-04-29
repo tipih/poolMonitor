@@ -24,9 +24,26 @@ HeatPumpManager::HeatPumpManager()
 {
 }
 
+HeatPumpManager::~HeatPumpManager()
+{
+  // Allocated once in begin(). In practice this object lives for the
+  // entire firmware lifetime, so the destructor never actually runs on
+  // the ESP32 — but defining it keeps ownership symmetric with
+  // TemperatureSensor and avoids a leak if the instance is ever scoped.
+  if (_activeInstance == this)
+    _activeInstance = nullptr;
+  delete _serial;
+  _serial = nullptr;
+}
+
 void HeatPumpManager::begin(uint8_t rxPin, uint8_t txPin, uint8_t dePin, uint8_t rePin,
                             uint8_t slaveId, uint32_t baud, uint8_t uartNum)
 {
+  if (_initialized) {
+    Serial.println("[HeatPump] begin() called twice; ignoring");
+    return;
+  }
+
   _dePin = dePin;
   _rePin = rePin;
   _slaveId = slaveId;

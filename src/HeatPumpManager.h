@@ -40,6 +40,7 @@ public:
   };
 
   HeatPumpManager();
+  ~HeatPumpManager();
 
   /**
    * Initialize the manager.
