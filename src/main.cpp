@@ -37,13 +37,6 @@
 #define GPIO_BUTTON 13
 #define GPIO_ONE_WIRE 4
 
-// RS485 / Modbus pins for heat pump (MAX485 transceiver on UART2)
-#define GPIO_RS485_RX 16
-#define GPIO_RS485_TX 17
-#define GPIO_RS485_DE 18
-#define GPIO_RS485_RE 19
-#define HEATPUMP_SLAVE_ID 1
-
 // Timing Constants
 #define TEMP_READ_INTERVAL 10000     // Temperature reading interval (ms)
 #define TEMP_CALIBRATION_OFFSET 1.5  // Temperature calibration offset
@@ -134,6 +127,10 @@ void publishStatusToMQTT()
     snprintf(buf, sizeof(buf), "%u", (unsigned)heatPumpManager.getSilenceMode());
     mqttManager.publishToSubtopic("heatpump/silence", buf);
     mqttManager.publishToSubtopic("heatpump/online", heatPumpManager.isOnline() ? "1" : "0");
+    snprintf(buf, sizeof(buf), "%.1f", heatPumpManager.getCompressorHz());
+    mqttManager.publishToSubtopic("heatpump/compressor_hz", buf);
+    snprintf(buf, sizeof(buf), "%.0f", heatPumpManager.getCompressorPercent());
+    mqttManager.publishToSubtopic("heatpump/compressor_pct", buf);
   }
 }
 //*****************************************************************************/
@@ -185,10 +182,11 @@ void setup()
   // Initialize schedule manager with dependencies and load from NVM
   scheduleManager.begin(pumpController, mqttManager);
 
-  // Initialize heat pump Modbus link (UART2 + MAX485).
-  heatPumpManager.begin(GPIO_RS485_RX, GPIO_RS485_TX,
-                        GPIO_RS485_DE, GPIO_RS485_RE,
-                        HEATPUMP_SLAVE_ID);
+  // Initialize heat pump cloud REST client (linked-go.com).
+  heatPumpManager.begin(LINKED_GO_USER, LINKED_GO_PASS);
+#ifdef HEATPUMP_POLL_MS
+  heatPumpManager.setPollInterval(HEATPUMP_POLL_MS);
+#endif
 
   Serial.println("Setup complete!");
 }
@@ -247,7 +245,7 @@ void loop()
      publishStatusToMQTT();
    }
 
-  // Service the heat pump Modbus link. The manager rate-limits itself.
+  // Service the heat pump cloud REST client. The manager rate-limits itself.
   heatPumpManager.poll();
 
   // Check and execute pump schedule (every 500ms).

@@ -193,7 +193,7 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
   bool hpHasData = _heatPumpManager && _heatPumpManager->getLastUpdate() != 0;
   bool hpOnline = _heatPumpManager && _heatPumpManager->isOnline();
 
-  char buffer[384];
+  char buffer[448];
   if (hpHasData)
   {
     snprintf(buffer, sizeof(buffer),
@@ -201,7 +201,8 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
              "\"hh\":\"%02u\",\"mm\":\"%02u\",\"ss\":\"%02u\",\"dd\":\"%02u\",\"md\":\"%02u\",\"yy\":\"%u\","
              "\"currentTemp\":\"%.2f\","
              "\"hpOnline\":\"%u\",\"hpPower\":\"%u\",\"hpInlet\":\"%.1f\",\"hpOutlet\":\"%.1f\","
-             "\"hpAmbient\":\"%.1f\",\"hpTarget\":\"%.1f\",\"hpMode\":\"%u\",\"hpError\":\"%u\"}",
+             "\"hpAmbient\":\"%.1f\",\"hpTarget\":\"%.1f\",\"hpMode\":\"%u\",\"hpError\":\"%u\","
+             "\"hpCompHz\":\"%.1f\",\"hpCompPct\":\"%.0f\"}",
              _inputManager->getRelaxStatus(),
              _pumpController.getCurrentSpeed(),
              _scheduleManager.getOnHour(),
@@ -221,7 +222,9 @@ void WebServerManager::handleState(AsyncWebServerRequest *request)
              _heatPumpManager->getAmbientTempC(),
              _heatPumpManager->getTargetTempC(),
              (unsigned)_heatPumpManager->getOperationMode(),
-             _heatPumpManager->getErrorCode());
+             _heatPumpManager->getErrorCode(),
+             _heatPumpManager->getCompressorHz(),
+             _heatPumpManager->getCompressorPercent());
   }
   else
   {

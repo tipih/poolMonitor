@@ -1,13 +1,13 @@
 # Pool Monitor
 
-ESP32-based pool pump and heat pump monitoring & control system with a modern web interface, Dallas temperature sensing, Modbus RTU heat pump readout, MQTT integration, Home Assistant auto-discovery, and host-PC unit tests.
+ESP32-based pool pump and heat pump monitoring & control system with a modern web interface, Dallas temperature sensing, Linked-Go cloud REST heat pump readout, MQTT integration, Home Assistant auto-discovery, and host-PC unit tests.
 
 ## ✨ Features
 
 ### Core Functionality
 - **🎮 Remote Pool Pump Control**: Control pump speed (Low/Med/High/Stop) via web interface or MQTT
 - **🌡️ Temperature Monitoring**: Real-time pool water temperature using Dallas DS18B20 sensor
-- **♨️ Heat Pump Read-Out**: Modbus RTU (RS485) integration for Welldana PMH / Fairland IPHCR family — inlet/outlet/ambient temperature, target temperature, operation & silence mode, power and error code (read-only; see [HEATPUMP.md](HEATPUMP.md))
+- **♈️ Heat Pump Read-Out**: Cloud REST API integration via [linked-go.com](https://cloud.linked-go.com) (Fairland / Welldana / Comfortpool app account) — inlet/outlet/ambient temperature, target temperature, operation & silence mode, compressor frequency & load, power and error code (read-only; see [HEATPUMP.md](HEATPUMP.md))
 - **📱 Modern Web Interface**: Responsive dashboard with 5 color themes and animated pool water effects
 - **🏠 Home Assistant Integration**: Automatic MQTT discovery for seamless smart home integration
 - **⏰ Scheduled Operation**: Configure automatic on/off times with persistent storage
@@ -24,7 +24,7 @@ ESP32-based pool pump and heat pump monitoring & control system with a modern we
 
 ### Code Quality
 - **🏗️ Modular Architecture**: 10 manager classes for maintainability
-- **🧪 Host-PC Unit Tests**: Unity test suite (`pio test -e native`) covers `PumpController`, `ScheduleManager`, and `HeatPumpManager` pure logic
+- **🧪 Host-PC Unit Tests**: Unity test suite (`pio test -e native`) covers `PumpController` and `ScheduleManager` pure logic — 18 test cases
 - **🔇 DEBUG Stripped from Production**: `DBG_PRINT*` macros compile to no-ops in `[env:production]`; verbose serial logs only in `[env:test]`
 - **🛡️ OTA Protection**: Prevents pump operations during firmware updates
 - **🐛 Bug-Free**: Fixed buffer overflows, WiFi event issues, memory leaks
@@ -37,8 +37,13 @@ ESP32-based pool pump and heat pump monitoring & control system with a modern we
 - **Dallas DS18B20** temperature sensor (one-wire)
 - **Relay Module** or transistor circuit to interface with pool pump control buttons
 - **4.7kΩ resistor** (pull-up for DS18B20)
-- **MAX485 (or compatible) RS485 transceiver** for the heat pump Modbus link
+- **WiFi access** to the Internet (for Linked-Go cloud API calls)
 - **Push button** (optional, for manual input/testing)
+
+> ℹ️ The RS485/MAX485 transceiver required for the old Modbus integration is
+> no longer needed. Heat pump data is now fetched over HTTPS from the
+> Linked-Go cloud service using the same credentials as the Fairland /
+> Comfortpool mobile app.
 
 ### 📍 Pin Configuration
 
@@ -47,16 +52,12 @@ ESP32-based pool pump and heat pump monitoring & control system with a modern we
 | **4** | DS18B20 Data | Pool temperature sensor (one-wire) |
 | **13** | Button Input | Manual control button (active HIGH) |
 | **14** | Medium Speed | Pool pump medium speed control |
-| **16** | UART2 RX | MAX485 `RO` (heat pump Modbus) |
-| **17** | UART2 TX | MAX485 `DI` (heat pump Modbus) |
-| **18** | RS485 DE | MAX485 driver enable (active high) |
-| **19** | RS485 !RE | MAX485 receiver enable (active low) |
 | **25** | Stop | Pool pump stop control |
 | **26** | Low Speed | Pool pump low speed control |
 | **27** | High Speed | Pool pump high speed control |
 | **LED_BUILTIN** | Status LED | Connection status indicator |
 
-> If your MAX485 module ties `DE` and `!RE` together, wire that single pin to GPIO 18 and pass `18` for both `dePin` and `rePin` in `HeatPumpManager::begin(...)`. Modbus defaults: 9600 8N1, slave ID 1.
+> GPIO 16–19 (previously used for RS485) are now free for other purposes.
 
 ## 📦 Software Requirements
 
@@ -65,30 +66,34 @@ Built with PlatformIO using the Arduino framework.
 ### Dependencies
 
 ```ini
-- PubSubClient @ ^2.8           # MQTT client library
-- AsyncTCP-esphome @ ^1.2.2     # Asynchronous TCP library  
-- ESPAsyncWebServer-esphome @ ^2.1.0  # Async web server
-- DallasTemperature @ ^3.10.0   # DS18B20 sensor library
-- OneWire @ ^2.3.8              # One-wire protocol
-- 4-20ma/ModbusMaster @ ^2.0.1  # Modbus RTU client (heat pump)
-- Preferences @ 2.0.0           # NVS storage
-- WiFi @ 2.0.0                  # WiFi connectivity
-- ArduinoOTA @ 2.0.0            # OTA updates
+- PubSubClient @ ^2.8                    # MQTT client library
+- AsyncTCP-esphome @ ^1.2.2              # Asynchronous TCP library  
+- ESPAsyncWebServer-esphome @ ^2.1.0     # Async web server
+- DallasTemperature @ ^3.10.0            # DS18B20 sensor library
+- bblanchon/ArduinoJson @ ^7.0.0         # JSON parse/serialise (cloud REST API)
+- Preferences @ 2.0.0                    # NVS storage
+- WiFi @ 2.0.0                           # WiFi connectivity
+- ArduinoOTA @ 2.0.0                     # OTA updates
+- HTTPClient (bundled with ESP32 core)   # HTTPS REST calls
+- WiFiClientSecure (bundled)             # TLS for Linked-Go cloud API
 ```
 
 ## ⚙️ Configuration
 
 ### 1. Credentials Setup
 
-Create a `src/cred.h` file with your credentials:
+Edit `src/cred.h` with your credentials:
 
 ```cpp
-#define SS_ID "your-wifi-ssid"
-#define auth "your-wifi-password"
-#define HTTP_USER "admin"
-#define HTTP_PASS "your-web-password"
-#define MQTT_USER "mqtt-username"  // Optional
-#define MQTT_PASS "mqtt-password"  // Optional
+#define SS_ID          "your-wifi-ssid"
+#define auth           "your-wifi-password"
+#define HTTP_USER      "admin"
+#define HTTP_PASS      "your-web-password"
+#define MQTT_USER      "mqtt-username"
+#define MQTT_PASS      "mqtt-password"
+// Linked-Go cloud account (same as Fairland / Comfortpool mobile app)
+#define LINKED_GO_USER "your-email@example.com"
+#define LINKED_GO_PASS "your-app-password"
 ```
 
 **Note**: `cred.h` is excluded from version control via `.gitignore` to protect your credentials.
@@ -158,15 +163,16 @@ platformio test -e native
 
 Covered managers and behaviours:
 
-- **`PumpController`** — initial state, speed setters, `getSpeedString()` mapping
-- **`ScheduleManager`** — `isValidSchedule()` (range + equal-hour rejection), `setSchedule()` ignores invalid input, `checkAndExecute()` drives pump + MQTT on hour boundaries and is idempotent within an hour
-- **`HeatPumpManager`** — initial cached state, `resultToString()` for known and unknown Modbus codes, `poll()` no-op before `begin()`
+- **`PumpController`** (5 tests) — initial state, `begin()` side-effects, all speed setters and string mappings, repeated changes, stop from running
+- **`ScheduleManager`** (13 tests) — default hours, `isValidSchedule()` (range + equal-hour + midnight-wrap), `setSchedule()` ignores invalid input, `checkAndExecute()` drives pump + MQTT at hour boundaries, idempotent within an hour, no-op at unrelated hour, safe before `begin()`, midnight on-hour
 
-Requires a host C++ compiler on `PATH`. On the development host this is
-LLVM clang at `C:\Program Files\LLVM\bin`; the `[env:native]` PlatformIO
-env injects `scripts/shims/` (gcc/g++/ar/ranlib `.cmd` wrappers around
-clang) automatically. See [test/test_native/README.md](test/test_native/README.md) for layout and
-what is intentionally not covered (real GPIO/NVS/RS485/WiFi).
+Requires a host C++ compiler on `PATH`. On this machine LLVM clang at
+`C:\Program Files\LLVM\bin` is wrapped by `scripts/shims/` (gcc/g++/ar/ranlib
+`.cmd` files). See [test/test_native/README.md](test/test_native/README.md) for layout and what is
+intentionally not covered (real GPIO / NVS / HTTPS / WiFi).
+
+> `HeatPumpManager` uses `HTTPClient` and `WiFiClientSecure` which are
+> ESP32-only; its behaviour is verified by integration testing on the device.
 
 ## 🌐 Usage
 
@@ -203,9 +209,11 @@ The device automatically publishes MQTT discovery messages for Home Assistant:
 - `sensor.poolmonitor_hp_mode` - Operation mode (Auto / Heat / Cool)
 - `sensor.poolmonitor_hp_silence` - Silence mode (Smart / Silence / Super Silence)
 - `sensor.poolmonitor_hp_error` - Heat pump error code
-- `binary_sensor.poolmonitor_hp_online` - Modbus link health (problem class)
+- `binary_sensor.poolmonitor_hp_online` - Cloud link health (problem class)
+- `sensor.poolmonitor_hp_comp_hz` - Compressor frequency (Hz)
+- `sensor.poolmonitor_hp_comp_pct` - Compressor load (%)
 
-All entities appear automatically under the "PoolMonitor" device in Home Assistant. Heat pump control entities (switch / number / select) are intentionally **not** advertised — the integration is read-only at this stage.
+All entities appear automatically under the "PoolMonitor" device in Home Assistant. Heat pump control entities are intentionally **not** advertised — the integration is read-only at this stage.
 
 ### 📡 MQTT Topics
 
@@ -225,7 +233,9 @@ All entities appear automatically under the "PoolMonitor" device in Home Assista
 - `pool/monitor/heatpump/mode` - `0`=Auto, `1`=Heat, `2`=Cool
 - `pool/monitor/heatpump/silence` - `0`=Smart, `1`=Silence, `2`=Super Silence
 - `pool/monitor/heatpump/error` - Error code (numeric)
-- `pool/monitor/heatpump/online` - Modbus link health (`1` / `0`)
+- `pool/monitor/heatpump/online` - Cloud link health (`1` / `0`)
+- `pool/monitor/heatpump/compressor_hz` - Compressor frequency (Hz)
+- `pool/monitor/heatpump/compressor_pct` - Compressor load (0–100 %)
 
 **Home Assistant Discovery:**
 - `homeassistant/sensor/poolmonitor_*` - Auto-discovery configs
@@ -269,12 +279,11 @@ src/
 ├── TimeManager.*         # NTP time synchronization  
 ├── WebServerManager.*    # HTTP server & routes (incl. heat pump tile)
 ├── InputManager.*        # Button input & LED status
-└── HeatPumpManager.*     # Modbus RTU heat pump readout (RS485)
+└── HeatPumpManager.*     # Linked-Go cloud REST heat pump readout (HTTPS)
 
 test/
 └── test_native/          # Host-PC Unity unit tests
-    ├── mocks/            # Arduino, Preferences, HardwareSerial,
-    │                     # ModbusMaster, MQTTManager mocks
+    ├── mocks/            # Arduino, Preferences, MQTTManager mocks
     └── test_main.cpp     # Test runner
 
 scripts/

@@ -400,6 +400,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="time-row"><label>Inlet</label><span id="hpInlet">--</span></div>
           <div class="time-row"><label>Outlet</label><span id="hpOutlet">--</span></div>
           <div class="time-row"><label>Ambient</label><span id="hpAmbient">--</span></div>
+          <div class="time-row"><label>Compressor</label><span id="hpComp">--</span></div>
           <div class="time-row"><label>Error code</label><span id="hpError">--</span></div>
         </div>
       </div>
@@ -620,6 +621,7 @@ if (pumpSpeed==0)
       document.getElementById("hpInlet").textContent = obj.hpInlet + "°C";
       document.getElementById("hpOutlet").textContent = obj.hpOutlet + "°C";
       document.getElementById("hpAmbient").textContent = obj.hpAmbient + "°C";
+      document.getElementById("hpComp").textContent = obj.hpCompHz + " Hz (" + obj.hpCompPct + "%)";
       document.getElementById("hpError").textContent = obj.hpError;
     } else {
       hpStatusEl.textContent = "Offline";
@@ -630,6 +632,7 @@ if (pumpSpeed==0)
       document.getElementById("hpInlet").textContent = "--";
       document.getElementById("hpOutlet").textContent = "--";
       document.getElementById("hpAmbient").textContent = "--";
+      document.getElementById("hpComp").textContent = "--";
       document.getElementById("hpError").textContent = "--";
     }
 

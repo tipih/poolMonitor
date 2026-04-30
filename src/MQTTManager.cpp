@@ -294,5 +294,45 @@ void MQTTManager::publishHADiscovery()
            _baseTopic, haId, deviceJson);
   _mqttClient.publish(topic, payload, true);
 
+  // Compressor frequency (Hz)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_hz/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Compressor Hz\",\"state_topic\":\"%s/heatpump/compressor_hz\","
+           "\"unit_of_measurement\":\"Hz\",\"state_class\":\"measurement\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_hz\","
+           "\"icon\":\"mdi:sine-wave\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Compressor load (%)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_pct/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Compressor Load\",\"state_topic\":\"%s/heatpump/compressor_pct\","
+           "\"unit_of_measurement\":\"%%\",\"state_class\":\"measurement\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_pct\","
+           "\"icon\":\"mdi:gauge\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Compressor frequency (Hz)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_hz/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Compressor Hz\",\"state_topic\":\"%s/heatpump/compressor_hz\","
+           "\"unit_of_measurement\":\"Hz\",\"state_class\":\"measurement\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_hz\","
+           "\"icon\":\"mdi:sine-wave\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
+  // Compressor load (%%)
+  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_pct/config", haId);
+  snprintf(payload, sizeof(payload),
+           "{\"name\":\"Heat Pump Compressor Load\",\"state_topic\":\"%s/heatpump/compressor_pct\","
+           "\"unit_of_measurement\":\"%%\",\"state_class\":\"measurement\","
+           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_pct\","
+           "\"icon\":\"mdi:gauge\",\"device\":%s}",
+           _baseTopic, haId, deviceJson);
+  _mqttClient.publish(topic, payload, true);
+
   Serial.println("Home Assistant discovery configs published");
 }
