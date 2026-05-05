@@ -82,7 +82,13 @@ void MQTTManager::reconnect()
     {
       Serial.println("connected");
 
-      // Subscribe to command topic
+      // Subscribe to command topic.
+      // NOTE: 80-byte topic buffer is sized for short base topics like
+      // "pool/monitor" / "pool/monitor/test" plus the longest subtopic
+      // suffix used anywhere in this file ("/heatpump/compressor_pct",
+      // 24 chars). snprintf() truncates silently if _baseTopic ever
+      // grows past ~55 chars — keep this buffer in sync with
+      // publishToSubtopic() below if base topics get longer.
       char topic[80];
       snprintf(topic, sizeof(topic), "%s/command", _baseTopic);
       _mqttClient.subscribe(topic);
@@ -125,6 +131,8 @@ bool MQTTManager::publish(const char *topic, const char *payload, bool retain)
 
 bool MQTTManager::publishToSubtopic(const char *subtopic, const char *payload, bool retain)
 {
+  // 80-byte buffer: see note in reconnect(). Safe for current base
+  // topics (≤17 chars) and subtopics (≤24 chars).
   char topic[80];
   snprintf(topic, sizeof(topic), "%s/%s", _baseTopic, subtopic);
   return publish(topic, payload, retain);
@@ -305,26 +313,6 @@ void MQTTManager::publishHADiscovery()
   _mqttClient.publish(topic, payload, true);
 
   // Compressor load (%)
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_pct/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Heat Pump Compressor Load\",\"state_topic\":\"%s/heatpump/compressor_pct\","
-           "\"unit_of_measurement\":\"%%\",\"state_class\":\"measurement\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_pct\","
-           "\"icon\":\"mdi:gauge\",\"device\":%s}",
-           _baseTopic, haId, deviceJson);
-  _mqttClient.publish(topic, payload, true);
-
-  // Compressor frequency (Hz)
-  snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_hz/config", haId);
-  snprintf(payload, sizeof(payload),
-           "{\"name\":\"Heat Pump Compressor Hz\",\"state_topic\":\"%s/heatpump/compressor_hz\","
-           "\"unit_of_measurement\":\"Hz\",\"state_class\":\"measurement\","
-           "\"value_template\":\"{{ value }}\",\"unique_id\":\"%s_hp_comp_hz\","
-           "\"icon\":\"mdi:sine-wave\",\"device\":%s}",
-           _baseTopic, haId, deviceJson);
-  _mqttClient.publish(topic, payload, true);
-
-  // Compressor load (%%)
   snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_hp_comp_pct/config", haId);
   snprintf(payload, sizeof(payload),
            "{\"name\":\"Heat Pump Compressor Load\",\"state_topic\":\"%s/heatpump/compressor_pct\","

@@ -65,8 +65,8 @@ const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 
-signed int rssi = 0;
-unsigned long lastDallasRead = millis();
+int rssi = 0; // WiFi RSSI in dBm (negative when connected, 0 when not)
+unsigned long lastDallasRead = 0; // initialized in setup() once millis() is meaningful
 
 // Preferences storage for WiFiManager — must outlive setup() because
 // WiFiManager retains a pointer for use on the reconnect/restart path.
@@ -147,11 +147,17 @@ void setup()
   Serial.begin(115200);
   delay(500);
 
+  // Anchor periodic Dallas reads to setup() time so the first read
+  // happens TEMP_READ_INTERVAL after boot, not at t=0.
+  lastDallasRead = millis();
+
   // Initialize temperature sensor
   temperatureSensor.begin(GPIO_ONE_WIRE, TEMP_CALIBRATION_OFFSET);
 
-  // Initialize WiFi Manager (uses file-scope wifiPreferences for persistent lifetime)
-  wifiManager.begin(ssid, password, &wifiPreferences);
+  // Initialize WiFi Manager (uses file-scope wifiPreferences for persistent lifetime).
+  // Reuse MQTT_CLIENT_ID as the STA hostname so the router/DHCP shows
+  // "PoolMonitor" / "PoolMonitor_Test" instead of an opaque MAC.
+  wifiManager.begin(ssid, password, &wifiPreferences, MQTT_CLIENT_ID);
 
   // Initialize MQTT Manager
   mqttManager.begin(MQTT_HOST, MQTT_PORT, MQTT_CLIENT_ID, MQTT_TOPIC, MQTT_USER, MQTT_PASS);

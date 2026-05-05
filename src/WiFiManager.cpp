@@ -1,6 +1,12 @@
 #include "WiFiManager.h"
 #include <Arduino.h>
 
+// NVS namespace + key for the WiFi reconnect/reset counter. Kept as
+// named constants so the two call sites (load on begin(), increment in
+// the reconnect path) cannot drift apart on a typo.
+static const char *kResetNamespace = "reset";
+static const char *kResetCounterKey = "resetCounter";
+
 // Static member initialization
 Preferences *WiFiManager::_staticPrefs = nullptr;
 unsigned long *WiFiManager::_staticResetCounter = nullptr;
@@ -22,7 +28,8 @@ WiFiManager::~WiFiManager()
 {
 }
 
-void WiFiManager::begin(const char *ssid, const char *password, Preferences *prefs)
+void WiFiManager::begin(const char *ssid, const char *password, Preferences *prefs,
+                        const char *hostname)
 {
   _ssid = ssid;
   _password = password;
@@ -32,8 +39,8 @@ void WiFiManager::begin(const char *ssid, const char *password, Preferences *pre
   // Get reset counter from preferences
   if (_preferences)
   {
-    _preferences->begin("reset", false);
-    _resetCounter = _preferences->getULong("resetCounter", 0);
+    _preferences->begin(kResetNamespace, false);
+    _resetCounter = _preferences->getULong(kResetCounterKey, 0);
     _preferences->end();
     _staticResetCounter = &_resetCounter;
 
@@ -49,6 +56,16 @@ void WiFiManager::begin(const char *ssid, const char *password, Preferences *pre
   WiFi.onEvent(onStationConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(onGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(onStationDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  // Force STA mode and apply hostname BEFORE WiFi.begin() so the DHCP
+  // request advertises it. setHostname() is a no-op once connected.
+  WiFi.mode(WIFI_STA);
+  if (hostname && *hostname)
+  {
+    WiFi.setHostname(hostname);
+    Serial.print("Hostname: ");
+    Serial.println(hostname);
+  }
 
   // Start WiFi connection
   WiFi.begin(_ssid, _password);
@@ -153,8 +170,8 @@ void WiFiManager::handle()
     if (_staticPrefs && _staticResetCounter)
     {
       (*_staticResetCounter)++;
-      _staticPrefs->begin("reset", false);
-      _staticPrefs->putULong("resetCounter", *_staticResetCounter);
+      _staticPrefs->begin(kResetNamespace, false);
+      _staticPrefs->putULong(kResetCounterKey, *_staticResetCounter);
       _staticPrefs->end();
     }
 

@@ -22,8 +22,10 @@ public:
   WiFiManager();
   ~WiFiManager();
 
-  // Initialize WiFi with SSID and password
-  void begin(const char *ssid, const char *password, Preferences *prefs);
+  // Initialize WiFi with SSID, password, and optional STA hostname
+  // (the name the device announces over DHCP, e.g. "PoolMonitor").
+  void begin(const char *ssid, const char *password, Preferences *prefs,
+             const char *hostname = nullptr);
 
   // Check if WiFi is connected
   bool isConnected();

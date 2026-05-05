@@ -80,9 +80,11 @@ All previously reported dead code has been removed. No new dead code found.
 **Status: FIXED** — `_reconnectAttempts` is reset to 0 inside `onGotIP()`.
 
 ### 2. Buffer Overflow Risk in handleState()
-**Status: FIXED** — `WebServerManager::handleState()` uses `snprintf()` throughout,
-and the response buffer was grown from 200 to 256 bytes (commit `eaaccb3`) to
-leave comfortable headroom over the ~175-byte worst-case payload.
+**Status: FIXED** — `WebServerManager::handleState()` uses `snprintf()` throughout.
+The response buffer was grown from 200 → 256 bytes (commit `eaaccb3`), then
+to **448 bytes** when the heat pump fields were added. Worst-case payload
+on the heat-pump branch is ~353 bytes (274 B of literal JSON + 78 B of
+maximum-width values + NUL), leaving ~95 bytes of headroom.
 
 ### 3. No Null Check Before Using _pumpController/_mqttManager
 **Status: FIXED** — `ScheduleManager::checkAndExecute()` guards with nullptr checks.
@@ -125,12 +127,26 @@ _(none currently tracked)_
 - All manager instances and config are file-scope globals.
 - Standard and idiomatic pattern for Arduino/ESP32 sketches; no change needed.
 
+### 3. `client.setInsecure()` in HeatPumpManager (linked-go.com cloud client)
+**Severity: LOW** | **Status: ACCEPTABLE**
+- All HTTPS calls (`login`, `fetchDeviceCode`, `fetchTelemetry`,
+  `sendControl`) use `WiFiClientSecure::setInsecure()` and therefore do
+  not validate the server certificate. The header comment already calls
+  this out ("Certificate not validated — no CA bundle on device").
+- **Risk**: an attacker on the local network or upstream path could
+  MITM the cloud API and intercept the linked-go.com credentials and
+  telemetry.
+- **Decision (accepted)**: device runs on a trusted home LAN behind the
+  user's router; storing and rotating a CA bundle on flash is more
+  maintenance burden than the threat model warrants. If this changes,
+  embed the CA as a PEM string and switch to `client.setCACert()`.
+
 ## Summary
 
 **Critical Issues**: 0
 **High Priority**: 0 open (1 accepted: PumpController blocking delays)
 **Medium Priority**: 0 open (1 accepted: PumpController architecture)
-**Low Priority**: 0 open
+**Low Priority**: 0 open (1 accepted: linked-go.com TLS not validated)
 
 **Accepted (won't-fix) items**:
 1. PumpController blocking delays — required by panel button-press hardware
@@ -138,6 +154,10 @@ _(none currently tracked)_
 2. PumpController coupling/architecture — same root cause; splitting the class
    is only worthwhile if the timing model becomes non-blocking, which is not
    planned.
+3. HeatPumpManager TLS not validated (`client.setInsecure()`) — device sits
+   on a trusted home LAN; embedding and rotating a CA bundle is not worth
+   the maintenance cost. Revisit if the device is ever exposed beyond the
+   LAN.
 
 **Recommendations Priority**:
 _(no open recommendations)_
